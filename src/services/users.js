@@ -6,9 +6,9 @@ export const usersCol = collection(db, 'users');
 
 /** Admin-only: provisions a real Firebase Auth account + Firestore user
  * doc for a new staff member (teacher/accountant/admin) or a parent. */
-export async function createStaffAccount({ email, name, role, title, childStudentIds }) {
+export async function createStaffAccount({ email, name, role, title, childStudentIds, password }) {
   const fn = httpsCallable(functions, 'createStaffAccount');
-  return fn({ email, name, role, title, childStudentIds });
+  return fn({ email, name, role, title, childStudentIds, password });
 }
 
 /** Admin-only: change a staff member's role and/or their granted permissions. */

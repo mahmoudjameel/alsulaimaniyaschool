@@ -420,11 +420,15 @@ const ROLE_DEFAULT_PERMISSIONS = {
 
 export const createStaffAccount = onCall(async (request) => {
   const { uid: actorUid, user: actor } = await requirePermission(request, 'users.manage');
-  const { email, name, role, title, childStudentIds } = request.data || {};
+  const { email, name, role, title, childStudentIds, password } = request.data || {};
   if (!email || !name || !role) throw new HttpsError('invalid-argument', 'الاسم والبريد والدور مطلوبة.');
   if (!['admin', 'teacher', 'accountant', 'parent', 'reception'].includes(role)) throw new HttpsError('invalid-argument', 'دور غير معروف.');
 
-  const tempPassword = randomTempPassword();
+  const chosen = typeof password === 'string' ? password.trim() : '';
+  if (chosen && chosen.length < 6) {
+    throw new HttpsError('invalid-argument', 'كلمة المرور يجب أن تكون 6 أحرف على الأقل.');
+  }
+  const tempPassword = chosen || randomTempPassword();
   const authUser = await auth.createUser({ email, password: tempPassword, displayName: name });
 
   const batch = db.batch();
