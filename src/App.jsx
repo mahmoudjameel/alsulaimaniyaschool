@@ -43,6 +43,18 @@ import Quiz from './pages/teacher/Quiz';
 import TeacherGrades from './pages/teacher/Grades';
 import TeacherAttendance from './pages/teacher/Attendance';
 import Observations from './pages/teacher/Observations';
+import TeacherFollowUp from './pages/teacher/TeacherFollowUp';
+import TeacherGradeSheet from './pages/teacher/TeacherGradeSheet';
+import TeacherStudents from './pages/teacher/TeacherStudents';
+import TeacherStudentDetail from './pages/teacher/TeacherStudentDetail';
+import TeacherStudentReport from './pages/teacher/TeacherStudentReport';
+import TeacherInbox from './pages/teacher/TeacherInbox';
+import TeacherRequests from './pages/teacher/TeacherRequests';
+import TeacherBulkGrades from './pages/teacher/TeacherBulkGrades';
+import TeacherExams from './pages/teacher/TeacherExams';
+import TeacherProfilePage from './pages/teacher/TeacherProfilePage';
+import AdminClassGradeSheet from './pages/admin/ClassGradeSheet';
+import AdminStaffHub from './pages/admin/AdminStaffHub';
 import ReportCard from './pages/ReportCard';
 
 import AccountantLayout from './layouts/AccountantLayout';
@@ -60,6 +72,8 @@ import ParentGrades from './pages/parent/ParentGrades';
 import ParentAttendance from './pages/parent/ParentAttendance';
 import ParentNotes from './pages/parent/ParentNotes';
 import ParentInbox from './pages/parent/ParentInbox';
+import ParentHomework from './pages/parent/ParentHomework';
+import ParentExams from './pages/parent/ParentExams';
 
 import ReceptionLayout from './layouts/ReceptionLayout';
 import ReceptionDashboard from './pages/reception/ReceptionDashboard';
@@ -76,6 +90,7 @@ import StudentNotes from './pages/student/StudentNotes';
 import StudentToday from './pages/student/StudentToday';
 import StudentHomework from './pages/student/StudentHomework';
 import StudentInbox from './pages/student/StudentInbox';
+import StudentExams from './pages/student/StudentExams';
 
 import PublicLayout from './layouts/PublicLayout';
 import PublicHome from './pages/public/Home';
@@ -112,9 +127,11 @@ export default function App() {
             <Route path="expenses" element={<Expenses />} />
             <Route path="classes" element={<Classes />} />
             <Route path="classes/:id" element={<ClassDetail />} />
+            <Route path="classes/:id/grade-sheet" element={<AdminClassGradeSheet />} />
             <Route path="teachers" element={<Teachers />} />
             <Route path="teachers/:id" element={<TeacherDetail />} />
             <Route path="grades" element={<AdminGrades />} />
+            <Route path="staff-hub" element={<AdminStaffHub />} />
             <Route path="enrollment" element={<Enrollment />} />
             <Route path="cms" element={<Cms />} />
             <Route path="users" element={<Users />} />
@@ -128,9 +145,19 @@ export default function App() {
             <Route path="schedule" element={<TeacherSchedule />} />
             <Route path="classes" element={<TeacherClasses />} />
             <Route path="classes/:id" element={<TeacherClassDetail />} />
+            <Route path="students" element={<TeacherStudents />} />
+            <Route path="students/:id" element={<TeacherStudentDetail />} />
+            <Route path="students/:id/report" element={<TeacherStudentReport />} />
+            <Route path="inbox" element={<TeacherInbox />} />
+            <Route path="requests" element={<TeacherRequests />} />
+            <Route path="bulk-grades" element={<TeacherBulkGrades />} />
+            <Route path="exams" element={<TeacherExams />} />
+            <Route path="profile" element={<TeacherProfilePage />} />
             <Route path="builder" element={<Builder />} />
             <Route path="quiz" element={<Quiz />} />
             <Route path="grades" element={<TeacherGrades />} />
+            <Route path="grade-sheet" element={<TeacherGradeSheet />} />
+            <Route path="follow-up" element={<TeacherFollowUp />} />
             <Route path="attendance" element={<TeacherAttendance />} />
             <Route path="attendance-report" element={<AttendanceReport />} />
             <Route path="diary" element={<TeacherDiary />} />
@@ -168,6 +195,8 @@ export default function App() {
             <Route path="grades" element={<ParentGrades />} />
             <Route path="attendance" element={<ParentAttendance />} />
             <Route path="notes" element={<ParentNotes />} />
+            <Route path="homework" element={<ParentHomework />} />
+            <Route path="exams" element={<ParentExams />} />
             <Route path="inbox" element={<ParentInbox />} />
             <Route path="announcements" element={<ParentAnnouncements />} />
             <Route path="absence" element={<ParentAbsence />} />
@@ -181,6 +210,7 @@ export default function App() {
             <Route path="grades" element={<StudentGrades />} />
             <Route path="attendance" element={<StudentAttendance />} />
             <Route path="homework" element={<StudentHomework />} />
+            <Route path="exams" element={<StudentExams />} />
             <Route path="achievements" element={<StudentAchievements />} />
             <Route path="fees" element={<StudentFees />} />
             <Route path="announcements" element={<StudentAnnouncements />} />

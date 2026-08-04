@@ -14,6 +14,8 @@ const PRIMARY_NAV = [
 const MORE_NAV = [
   { to: '/parent/grades', label: 'الدرجات', icon: 'grade' },
   { to: '/parent/attendance', label: 'الحضور', icon: 'event_available' },
+  { to: '/parent/homework', label: 'الواجبات', icon: 'assignment' },
+  { to: '/parent/exams', label: 'الاختبارات', icon: 'event' },
   { to: '/parent/notes', label: 'ملاحظات', icon: 'chat' },
   { to: '/parent/absence', label: 'تبرير غياب', icon: 'event_busy' },
   { to: '/parent/announcements', label: 'الإعلانات', icon: 'campaign' },

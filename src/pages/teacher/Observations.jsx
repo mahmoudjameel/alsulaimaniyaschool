@@ -6,10 +6,13 @@ import SearchInput from '../../components/SearchInput';
 import { ErrorBanner, SegmentedTabs } from '../../components/ui';
 import { useMyClasses } from '../../hooks/useMyClasses';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
-import { demoEnrollments, demoObservations } from '../../data/demo';
+import { demoEnrollments, demoObservations, demoStudents } from '../../data/demo';
 import { relativeDaysAr, relativeFromTimestamp } from '../../lib/relativeTime';
 import { createObservation } from '../../services/observations';
 import { filterByStudentSearch, matchesStudentSearch } from '../../lib/studentSearch';
+import { SCHOOL_NAME_AR } from '../../lib/constants';
+import { TEACHER_NOTE_TEMPLATE } from '../../lib/phone';
+import { openGuardianWhatsApp } from '../../lib/teacherWhatsApp';
 
 /** Clear classroom scenarios — map to stored kind/sentiment for existing data. */
 export const NOTE_SCENARIOS = [
@@ -25,6 +28,8 @@ export const NOTE_SCENARIOS = [
       'شارك بفعالية في الحصة اليوم.',
       'أظهر تحسناً واضحاً في المتابعة والحل.',
       'يستحق التقدير على تعاونه مع زملائه.',
+      'أجاد قراءة النص بصوت واضح ومرتّب.',
+      'تميّز في حلّ التمارين على السبورة.',
     ],
   },
   {
@@ -39,6 +44,8 @@ export const NOTE_SCENARIOS = [
       'يحتاج متابعة في فهم الدرس الحالي.',
       'لم يُسلّم الواجب المطلوب في الموعد.',
       'يُفضّل جلسة دعم قصيرة قبل الاختبار.',
+      'يحتاج مراجعة أساسية للمفاهيم السابقة.',
+      'يُرجى المتابعة المنزلية في حلّ التمارين اليومية.',
     ],
   },
   {
@@ -53,6 +60,8 @@ export const NOTE_SCENARIOS = [
       'يحتاج تذكيراً بالالتزام بتعليمات الصف.',
       'أظهر تحسناً في الانضباط خلال الحصة.',
       'يُرجى التعاون مع المدرسة حول سلوك الصف.',
+      'تحدث أثناء الشرح أكثر من مرة — نرجو المتابعة.',
+      'غادر مقعده دون إذن؛ نذكّر بقواعد الصف.',
     ],
   },
   {
@@ -66,6 +75,7 @@ export const NOTE_SCENARIOS = [
     templates: [
       'يتحسّن تدريجياً في العمل الجماعي.',
       'يحتاج تشجيعاً للمشاركة مع زملائه.',
+      'تعاون بشكل إيجابي ضمن مجموعة الصف.',
     ],
   },
   {
@@ -79,6 +89,49 @@ export const NOTE_SCENARIOS = [
     templates: [
       'اشتكى من تعب خلال الحصة — يُرجى المتابعة.',
       'يُفضّل إبلاغ الأسرة بأي ملاحظة صحّية حديثة.',
+      'طلب الخروج للعيادة بسبب صداع.',
+    ],
+  },
+  {
+    id: 'subject_ar',
+    title: 'لغة عربية',
+    hint: 'قراءة، إملاء، تعبير',
+    icon: 'menu_book',
+    kind: 'أكاديمي',
+    sentiment: 'ملاحظة',
+    audience: 'both',
+    templates: [
+      'يحتاج تقوية في الإملاء والمفردات.',
+      'أظهر تحسناً في القراءة الجهرية.',
+      'يُرجى التدريب على التعبير الكتابي في المنزل.',
+    ],
+  },
+  {
+    id: 'subject_math',
+    title: 'رياضيات',
+    hint: 'عمليات، مسائل، جداول',
+    icon: 'calculate',
+    kind: 'أكاديمي',
+    sentiment: 'ملاحظة',
+    audience: 'both',
+    templates: [
+      'يحتاج مراجعة جداول الضرب والعمليات الأساسية.',
+      'أجاد حلّ المسائل الكلامية اليوم.',
+      'يُفضّل تمارين إضافية قبل الاختبار الشهري.',
+    ],
+  },
+  {
+    id: 'early_grades',
+    title: 'المراحل الدنيا',
+    hint: 'تمهيدي / أساسي مبكر',
+    icon: 'child_care',
+    kind: 'أكاديمي',
+    sentiment: 'محايد',
+    audience: 'parent',
+    templates: [
+      'يحتاج تشجيعاً على إمساك القلم بثبات.',
+      'أظهر حماساً جميلاً في أنشطة الصف.',
+      'يُرجى المتابعة في حفظ الحروف والأرقام.',
     ],
   },
   {
@@ -91,6 +144,7 @@ export const NOTE_SCENARIOS = [
     audience: 'none',
     templates: [
       'ملاحظة داخلية للمتابعة مع الإدارة.',
+      'يُحال للمتابعة الإدارية عند الحاجة.',
     ],
   },
 ];
@@ -148,6 +202,13 @@ export default function Observations() {
   );
   const enrolledOptions = useMemo(() => filterByStudentSearch(enrolled, search), [enrolled, search]);
 
+  const [studentId, setStudentId] = useState(params.get('student') || '');
+
+  useEffect(() => {
+    const fromUrl = params.get('student');
+    if (fromUrl) setStudentId(fromUrl);
+  }, [params]);
+
   const { data: liveObs } = useLiveOrDemo(
     'observations',
     [where('teacherId', '==', profile?.id || '__none__'), orderBy('createdAt', 'desc')],
@@ -178,13 +239,15 @@ export default function Observations() {
     return searched;
   }, [demo, localObs, liveObs, activeClassId, search, listFilter]);
 
-  const [studentId, setStudentId] = useState('');
   const [scenarioId, setScenarioId] = useState(NOTE_SCENARIOS[0].id);
   const scenario = NOTE_SCENARIOS.find((s) => s.id === scenarioId) || NOTE_SCENARIOS[0];
   const [audience, setAudience] = useState(NOTE_SCENARIOS[0].audience);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [lastSaved, setLastSaved] = useState(null);
+
+  const { data: studentsDir } = useLiveOrDemo('students', [orderBy('name', 'asc')], demoStudents);
 
   useEffect(() => {
     setAudience(scenario.audience);
@@ -227,6 +290,7 @@ export default function Observations() {
         await createObservation(payload);
         setMessage('حُفظت الملاحظة وارتبطت بملف الطالب.');
       }
+      setLastSaved(payload);
       setStudentId('');
       setNote('');
       setScenarioId(NOTE_SCENARIOS[0].id);
@@ -367,6 +431,22 @@ export default function Observations() {
           </div>
 
           {message && <div style={{ fontSize: 12, color: 'var(--color-accent-700)' }}>{message}</div>}
+          {lastSaved && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-block"
+              onClick={() => {
+                const st = (studentsDir || []).find((s) => s.id === lastSaved.studentId);
+                const ok = openGuardianWhatsApp(
+                  st,
+                  TEACHER_NOTE_TEMPLATE(SCHOOL_NAME_AR, profile?.name, lastSaved.studentName, lastSaved.note),
+                );
+                if (!ok) window.alert('لا رقم واتساب لولي الأمر — حدّثه من الإدارة.');
+              }}
+            >
+              <Icon name="chat" size={14} /> إرسال آخر ملاحظة لولي الأمر عبر واتساب
+            </button>
+          )}
           <button type="submit" className="btn btn-primary btn-block" disabled={saving || !enrolled.length || !studentId}>
             <Icon name="save" size={15} /> {saving ? 'جارٍ الحفظ…' : 'حفظ الملاحظة'}
           </button>

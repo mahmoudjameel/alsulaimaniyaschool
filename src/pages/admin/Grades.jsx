@@ -1,12 +1,17 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { orderBy } from 'firebase/firestore';
+import Icon from '../../components/Icon';
 import SearchInput from '../../components/SearchInput';
 import { SegmentedTabs, EmptyRow, ErrorBanner } from '../../components/ui';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { useAuth } from '../../context/AuthContext';
-import { demoGradeEntries } from '../../data/demo';
+import { demoGradeEntries, demoStudents } from '../../data/demo';
 import { approveGrade, rejectGrade } from '../../services/grades';
 import { matchesStudentSearch } from '../../lib/studentSearch';
+import { SCHOOL_NAME_AR } from '../../lib/constants';
+import { TEACHER_GRADE_TEMPLATE } from '../../lib/phone';
+import { openGuardianWhatsApp } from '../../lib/teacherWhatsApp';
 
 const TABS = [
   { id: 'قيد المراجعة', label: 'قيد المراجعة' },
@@ -21,6 +26,7 @@ export default function Grades() {
   const [busyId, setBusyId] = useState(null);
   const [localOverrides, setLocalOverrides] = useState({});
   const { data, error, demo } = useLiveOrDemo('gradeEntries', [orderBy('createdAt', 'desc')], demoGradeEntries);
+  const { data: studentsDir } = useLiveOrDemo('students', [orderBy('name', 'asc')], demoStudents);
 
   const rows = useMemo(() => data.map((g) => (localOverrides[g.id] ? { ...g, status: localOverrides[g.id] } : g)), [data, localOverrides]);
   const counts = useMemo(() => ({
@@ -34,6 +40,21 @@ export default function Grades() {
   );
 
   const decidedBy = { uid: profile?.id, name: profile?.name, role: profile?.role };
+
+  const notifyGuardian = (entry) => {
+    const st = (studentsDir || []).find((s) => s.id === entry.studentId);
+    const ok = openGuardianWhatsApp(
+      st,
+      TEACHER_GRADE_TEMPLATE(
+        SCHOOL_NAME_AR,
+        entry.teacherName || profile?.name,
+        entry.studentName,
+        entry.assessmentTitle,
+        `${entry.score}/${entry.maxScore} (معتمدة)`,
+      ),
+    );
+    if (!ok) window.alert('لا رقم واتساب لولي الأمر على ملف الطالب.');
+  };
 
   const onApprove = async (entry) => {
     setBusyId(entry.id);
@@ -57,6 +78,9 @@ export default function Grades() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <ErrorBanner>{error && 'تعذّر تحميل الدرجات.'}</ErrorBanner>
+      <p style={{ margin: 0, fontSize: 14, color: 'var(--color-neutral-700)', lineHeight: 1.7 }}>
+        اعتماد درجات المعلّمين — بعد الاعتماد تظهر فوراً في بوابة الطالب وولي الأمر. يمكن إبلاغ ولي الأمر عبر واتساب.
+      </p>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <SegmentedTabs tabs={TABS.map((t) => ({ ...t, label: `${t.label} · ${counts[t.id]}`, active: filter === t.id, onClick: () => setFilter(t.id) }))} />
         <SearchInput
@@ -74,7 +98,16 @@ export default function Grades() {
             {view.map((g) => (
               <tr key={g.id}>
                 <td>{g.studentName}</td>
-                <td>{g.className} <span style={{ color: 'var(--color-neutral-500)', fontSize: 12 }}>· {g.subject}</span></td>
+                <td>
+                  {g.className} <span style={{ color: 'var(--color-neutral-500)', fontSize: 12 }}>· {g.subject}</span>
+                  {g.classId && (
+                    <div>
+                      <Link to={`/admin/classes/${g.classId}/grade-sheet`} style={{ fontSize: 11, color: 'var(--gold)' }}>
+                        كشف الصف للطباعة
+                      </Link>
+                    </div>
+                  )}
+                </td>
                 <td>
                   {g.assessmentTitle}
                   {(g.assessmentType || g.term) && (
@@ -92,7 +125,14 @@ export default function Grades() {
                       <button className="btn btn-ghost" style={{ fontSize: 12 }} disabled={busyId === g.id} onClick={() => onReject(g)}>رفض</button>
                     </>
                   ) : (
-                    <span className={`tag tag-${g.status === 'معتمد' ? 'accent' : 'neutral'}`}>{g.status}</span>
+                    <>
+                      <span className={`tag tag-${g.status === 'معتمد' ? 'accent' : 'neutral'}`}>{g.status}</span>
+                      {g.status === 'معتمد' && (
+                        <button type="button" className="btn btn-ghost" style={{ fontSize: 12, marginInlineStart: 6 }} onClick={() => notifyGuardian(g)}>
+                          <Icon name="chat" size={13} /> واتساب
+                        </button>
+                      )}
+                    </>
                   )}
                 </td>
               </tr>

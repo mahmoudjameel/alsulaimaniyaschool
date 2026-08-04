@@ -8,12 +8,14 @@ import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { enrolledDisplayCount, useEnrollmentCounts } from '../../hooks/useEnrollmentCounts';
 
 const QUICK = [
-  { to: '/teacher/schedule', icon: 'calendar_month', title: 'جدول الحصص', body: 'حصص اليوم والأسبوع.' },
-  { to: '/teacher/attendance', icon: 'fact_check', title: 'الحضور والغياب', body: 'تسجيل حضور صفّك لليوم.' },
-  { to: '/teacher/grades', icon: 'grade', title: 'الدرجات', body: 'امتحانات وفرض بانتظار الاعتماد.' },
-  { to: '/teacher/diary', icon: 'edit_note', title: 'دفتر اليوم', body: 'موضوع الحصة والواجب والتنبيه.' },
-  { to: '/teacher/attendance-report', icon: 'analytics', title: 'تقرير الحضور', body: 'من غاب كثيراً — للطباعة.' },
-  { to: '/teacher/classes', icon: 'group', title: 'صفوفي وطلابي', body: 'كشف الأسماء وملف الطالب.' },
+  { to: '/teacher/inbox', icon: 'notifications', title: 'إشعاراتي', body: 'درجات معتمدة وتبريرات وتنبيهات الإدارة.' },
+  { to: '/teacher/students', icon: 'group', title: 'كل طلابي', body: 'قائمة كاملة لكل الفصول — ملف واحد لكل طالب.' },
+  { to: '/teacher/attendance', icon: 'fact_check', title: 'الحضور والغياب', body: 'نفس أمس أو نموذج الصف لتسريع التسجيل.' },
+  { to: '/teacher/bulk-grades', icon: 'grid_view', title: 'رصد جماعي', body: 'عمود درجات لكل طلاب الصف دفعة واحدة.' },
+  { to: '/teacher/exams', icon: 'event', title: 'تقويم اختبارات', body: 'مواعيد تظهر للطالب بعد اعتماد الإدارة.' },
+  { to: '/teacher/follow-up', icon: 'warning', title: 'متابعة الطلاب', body: 'غياب متكرر ودرجات منخفضة — واتساب.' },
+  { to: '/teacher/requests', icon: 'handshake', title: 'طلبات واجتماعات', body: 'اجتماع ولي أمر أو تغطية حصة.' },
+  { to: '/teacher/diary', icon: 'edit_note', title: 'دفتر اليوم', body: 'واجب يظهر للطالب وولي الأمر.' },
 ];
 
 export default function TeacherDashboard() {
@@ -135,6 +137,9 @@ export default function TeacherDashboard() {
                 </Link>
                 <Link to={`/teacher/grades?class=${c.id}`} className="btn btn-secondary" style={{ fontSize: 12, textDecoration: 'none' }}>
                   درجات
+                </Link>
+                <Link to={`/teacher/follow-up?class=${c.id}`} className="btn btn-secondary" style={{ fontSize: 12, textDecoration: 'none' }}>
+                  متابعة
                 </Link>
                 <Link to={`/teacher/observations?class=${c.id}`} className="btn btn-secondary" style={{ fontSize: 12, textDecoration: 'none' }}>
                   ملاحظات

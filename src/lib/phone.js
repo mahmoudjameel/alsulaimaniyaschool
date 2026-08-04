@@ -123,3 +123,15 @@ export const ABSENCE_REMINDER_TEMPLATE = (schoolName, studentName, dateLabel) =>
 
 export const GENERAL_MESSAGE_TEMPLATE = (schoolName, guardianName) =>
   `السلام عليكم${guardianName ? ` أستاذ/ة ${guardianName}` : ''}،\nرسالة من ${schoolName}.`;
+
+/** Teacher → guardian: about a saved classroom note. */
+export const TEACHER_NOTE_TEMPLATE = (schoolName, teacherName, studentName, noteText) =>
+  `السلام عليكم،\nرسالة من المعلّم/ة ${teacherName || ''} — ${schoolName}.\nبخصوص الطالب/ة ${studentName}:\n${(noteText || '').trim()}\nيمكنكم متابعة التفاصيل من بوابة ولي الأمر.\nمع الاحترام.`;
+
+/** Teacher → guardian: academic / attendance follow-up. */
+export const TEACHER_FOLLOWUP_TEMPLATE = (schoolName, teacherName, studentName, reason) =>
+  `السلام عليكم،\nنودّ التنويه من المعلّم/ة ${teacherName || ''} في ${schoolName} بخصوص متابعة الطالب/ة ${studentName}.\n${reason || 'نرجو التعاون مع المدرسة لمتابعة الأمر.'}\nيمكنكم التواصل معنا أو متابعة بوابة ولي الأمر.\nمع الاحترام.`;
+
+/** Teacher → guardian: grade notice (after admin approval ideally). */
+export const TEACHER_GRADE_TEMPLATE = (schoolName, teacherName, studentName, assessmentTitle, scoreLabel) =>
+  `السلام عليكم،\nإشعار درجة من ${teacherName || 'المعلّم'} — ${schoolName}.\nالطالب/ة ${studentName}: ${assessmentTitle || 'تقييم'}${scoreLabel ? ` — ${scoreLabel}` : ''}.\nالتفاصيل في بوابة ولي الأمر بعد اعتماد الإدارة.\nمع الاحترام.`;

@@ -75,6 +75,7 @@ export default function TeacherDiary() {
       <ErrorBanner>{classesError && 'تعذّر تحميل الصفوف.'}</ErrorBanner>
       <p style={{ margin: 0, fontSize: 14, color: 'var(--color-neutral-700)', lineHeight: 1.7 }}>
         سجّل موضوع الحصة، الواجب، وتنبيهاً قصيراً للصف — يوم بيوم.
+        الواجب يظهر تلقائياً في قائمة واجبات الطالب وولي الأمر مع خيار «تمّ التسليم».
       </p>
 
       <form className="card" onSubmit={onSubmit} style={{ gap: 12, maxWidth: 640 }}>

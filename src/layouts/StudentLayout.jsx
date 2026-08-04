@@ -15,6 +15,7 @@ const MORE_NAV = [
   { to: '/student/grades', label: 'الدرجات', icon: 'grade' },
   { to: '/student/attendance', label: 'الحضور', icon: 'event_available' },
   { to: '/student/homework', label: 'الواجبات', icon: 'assignment' },
+  { to: '/student/exams', label: 'الاختبارات', icon: 'event' },
   { to: '/student/achievements', label: 'تقدّمي', icon: 'emoji_events' },
   { to: '/student/fees', label: 'المستحقات', icon: 'payments' },
   { to: '/student/announcements', label: 'الإعلانات', icon: 'campaign' },

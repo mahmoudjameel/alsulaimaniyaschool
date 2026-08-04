@@ -61,6 +61,12 @@ export default function TeacherClassDetail() {
           <Link to={`/teacher/grades?class=${id}`} className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
             <Icon name="grade" size={15} /> درجات
           </Link>
+          <Link to={`/teacher/grade-sheet?class=${id}`} className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
+            <Icon name="print" size={15} /> كشف للطباعة
+          </Link>
+          <Link to={`/teacher/follow-up?class=${id}`} className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
+            <Icon name="warning" size={15} /> متابعة
+          </Link>
           <Link to={`/teacher/diary?class=${id}`} className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
             <Icon name="edit_note" size={15} /> دفتر اليوم
           </Link>
@@ -100,8 +106,16 @@ export default function TeacherClassDetail() {
                     <td className="ah-tabnum">{s.displayId || '—'}</td>
                     <td>{s.grade || cls?.grade || '—'}</td>
                     <td style={{ textAlign: 'left' }}>
+                      <Link
+                        to={`/teacher/students/${sid}`}
+                        className="btn btn-primary"
+                        style={{ fontSize: 12, textDecoration: 'none' }}
+                      >
+                        ملف الطالب
+                      </Link>
+                      {' '}
                       <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setPeekId(sid)}>
-                        ملف سريع
+                        سريع
                       </button>
                     </td>
                   </tr>

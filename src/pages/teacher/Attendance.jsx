@@ -1,5 +1,5 @@
-import { Link, useSearchParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { orderBy } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import SearchInput from '../../components/SearchInput';
@@ -7,9 +7,13 @@ import { ErrorBanner } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useDocOrDemo, useLiveOrDemo } from '../../hooks/useFirestore';
 import { useMyClasses } from '../../hooks/useMyClasses';
-import { demoEnrollments } from '../../data/demo';
+import { demoEnrollments, demoStudents } from '../../data/demo';
 import { ATTENDANCE_STATUSES } from '../../lib/attendance';
+import { SCHOOL_NAME_AR } from '../../lib/constants';
+import { ABSENCE_REMINDER_TEMPLATE } from '../../lib/phone';
+import { openGuardianWhatsApp } from '../../lib/teacherWhatsApp';
 import { submitAttendance } from '../../services/attendance';
+import { saveAttendanceTemplate } from '../../services/homework';
 import { filterByStudentSearch } from '../../lib/studentSearch';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -44,6 +48,25 @@ export default function Attendance() {
   const [statuses, setStatuses] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+  const [lastAbsentees, setLastAbsentees] = useState([]);
+  const [tmplMsg, setTmplMsg] = useState('');
+
+  const { data: studentsDir } = useLiveOrDemo('students', [orderBy('name', 'asc')], demoStudents);
+
+  const yesterdayStr = useMemo(() => {
+    const d = new Date(`${date}T12:00:00`);
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }, [date]);
+
+  const { data: yesterdaySession } = useDocOrDemo(
+    activeClassId ? `classes/${activeClassId}/attendanceSessions/${yesterdayStr}` : null,
+    null,
+  );
+  const { data: attendanceTemplate } = useDocOrDemo(
+    activeClassId ? `classes/${activeClassId}/attendanceTemplates/default` : null,
+    null,
+  );
 
   useEffect(() => {
     const base = {};
@@ -62,6 +85,58 @@ export default function Attendance() {
     setStatuses(next);
   };
 
+  const applyRecordsMap = (records) => {
+    if (!records) return false;
+    const next = {};
+    for (const s of enrolled) {
+      const sid = s.studentId || s.id;
+      next[sid] = records[sid]?.status || 'حاضر';
+    }
+    setStatuses(next);
+    return true;
+  };
+
+  const copyYesterday = () => {
+    if (!yesterdaySession?.records) {
+      setTmplMsg(`لا يوجد حضور محفوظ لتاريخ ${yesterdayStr}.`);
+      return;
+    }
+    applyRecordsMap(yesterdaySession.records);
+    setTmplMsg(`تم نسخ حضور أمس (${yesterdayStr}) — راجع ثم احفظ.`);
+  };
+
+  const applyTemplate = () => {
+    if (!attendanceTemplate?.records) {
+      setTmplMsg('لا نموذج محفوظ لهذا الصف بعد.');
+      return;
+    }
+    applyRecordsMap(attendanceTemplate.records);
+    setTmplMsg('تم تطبيق النموذج المحفوظ — راجع ثم احفظ.');
+  };
+
+  const saveTemplate = async () => {
+    if (demo || classesDemo || !activeClass || !profile?.id) {
+      setTmplMsg('وضع العرض: صِل Firebase لحفظ النموذج.');
+      return;
+    }
+    const records = {};
+    for (const s of enrolled) {
+      const sid = s.studentId || s.id;
+      records[sid] = { studentName: s.studentName || s.name, status: statuses[sid] || 'حاضر' };
+    }
+    try {
+      await saveAttendanceTemplate({
+        classId: activeClassId,
+        teacherId: profile.id,
+        teacherName: profile.name,
+        records,
+      });
+      setTmplMsg('حُفظ نموذج الحضور لهذا الصف.');
+    } catch {
+      setTmplMsg('تعذّر حفظ النموذج.');
+    }
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     if (demo || classesDemo) { setMessage('وضع العرض التوضيحي: صِل مشروع Firebase لحفظ الحضور فعلياً.'); return; }
@@ -78,7 +153,16 @@ export default function Attendance() {
         }),
         takenByName: profile.name,
       });
-      setMessage('تمّ حفظ الحضور.');
+      const absentees = enrolled
+        .filter((s) => (statuses[s.studentId || s.id] || 'حاضر') === 'غائب')
+        .map((s) => ({
+          studentId: s.studentId || s.id,
+          studentName: s.studentName || s.name,
+        }));
+      setLastAbsentees(absentees);
+      setMessage(absentees.length
+        ? `تمّ حفظ الحضور · ${absentees.length} غائب — يمكنك إبلاغ أولياء الأمور أدناه.`
+        : 'تمّ حفظ الحضور.');
     } catch {
       setMessage('تعذّر حفظ الحضور. حاول مجدداً.');
     } finally {
@@ -104,7 +188,11 @@ export default function Attendance() {
             <input className="input" type="date" dir="ltr" value={date} onChange={(e) => setDate(e.target.value)} max={todayStr()} />
           </div>
           <button type="button" className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => setAll('حاضر')}>تحديد الكل حاضر</button>
+          <button type="button" className="btn btn-secondary" style={{ fontSize: 12 }} onClick={copyYesterday}>نفس أمس</button>
+          <button type="button" className="btn btn-secondary" style={{ fontSize: 12 }} onClick={applyTemplate}>نموذج الصف</button>
+          <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={saveTemplate}>حفظ كنموذج</button>
         </div>
+        {tmplMsg && <div style={{ fontSize: 12, color: 'var(--color-accent-700)', marginTop: 8 }}>{tmplMsg}</div>}
         <div style={{ marginTop: 12 }}>
           <SearchInput
             value={search}
@@ -154,7 +242,40 @@ export default function Attendance() {
           <Link to={`/teacher/attendance-report?class=${activeClassId}`} className="btn btn-secondary" style={{ textDecoration: 'none', fontSize: 13 }}>
             تقرير شهري
           </Link>
+          <Link to={`/teacher/follow-up?class=${activeClassId}`} className="btn btn-secondary" style={{ textDecoration: 'none', fontSize: 13 }}>
+            متابعة الطلاب
+          </Link>
         </div>
+
+        {lastAbsentees.length > 0 && (
+          <div style={{ marginTop: 16, padding: 12, border: '1px solid var(--line)', borderRadius: 12 }}>
+            <div className="card-title" style={{ fontSize: 14, marginBottom: 8 }}>إبلاغ أولياء الغائبين (واتساب)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {lastAbsentees.map((a) => {
+                const st = (studentsDir || []).find((s) => s.id === a.studentId);
+                return (
+                  <div key={a.studentId} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ flex: 1, fontSize: 13 }}>{a.studentName}</span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: 12 }}
+                      onClick={() => {
+                        const ok = openGuardianWhatsApp(
+                          st,
+                          ABSENCE_REMINDER_TEMPLATE(SCHOOL_NAME_AR, a.studentName, date),
+                        );
+                        if (!ok) window.alert('لا رقم واتساب مسجّل لهذا الطالب.');
+                      }}
+                    >
+                      <Icon name="chat" size={13} /> واتساب
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </form>
     </div>
   );

@@ -54,6 +54,12 @@ export default function ClassDetail() {
         <button type="button" className="btn btn-primary" style={{ fontSize: 13, marginInlineStart: 'auto' }} onClick={() => setEditing(true)}>
           <Icon name="edit" size={14} /> تعديل الصف والجدول
         </button>
+        <Link to={`/admin/classes/${id}/grade-sheet`} className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
+          <Icon name="print" size={14} /> كشف درجات للطباعة
+        </Link>
+        <Link to="/admin/grades" className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
+          <Icon name="grade" size={14} /> اعتماد الدرجات
+        </Link>
       </div>
 
       <div className="ah-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 16, alignItems: 'start' }}>

@@ -35,7 +35,10 @@ service cloud.firestore {
     // Creating accounts always goes through Cloud Functions (Admin SDK).
     match /users/{uid} {
       allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin() || hasPerm('users.manage'));
-      allow update: if isAdmin() || hasPerm('users.manage');
+      allow update: if isAdmin() || hasPerm('users.manage')
+        || (isSignedIn() && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['phone', 'whatsapp', 'contactPhone', 'contactWhatsApp', 'updatedAt']));
       allow create, delete: if false;
     }
 
@@ -170,7 +173,9 @@ service cloud.firestore {
         && request.resource.data.studentId is string
         && isGuardianOfStudent(request.resource.data.studentId);
       allow read: if hasPerm('students.manage') || hasPerm('classes.manage')
-        || (isSignedIn() && resource.data.guardianUid == request.auth.uid);
+        || (isSignedIn() && resource.data.guardianUid == request.auth.uid)
+        || (isTeacher() && resource.data.teacherIds != null
+          && request.auth.uid in resource.data.teacherIds);
       allow update: if hasPerm('students.manage') || hasPerm('classes.manage');
       allow delete: if isAdmin();
     }
@@ -205,6 +210,11 @@ service cloud.firestore {
       // Students & parents (signed-in) can read so diary surfaces on their portals.
       match /dayLogs/{date} {
         allow read: if isStaff() || isSignedIn();
+        allow create, update: if hasPerm('classes.manage')
+          || (isTeacher() && request.resource.data.teacherId == request.auth.uid);
+      }
+      match /attendanceTemplates/{templateId} {
+        allow read: if isStaff();
         allow create, update: if hasPerm('classes.manage')
           || (isTeacher() && request.resource.data.teacherId == request.auth.uid);
       }
@@ -246,7 +256,66 @@ service cloud.firestore {
     // salary — that stays in /staff which only finance can read. ----
     match /teacherProfiles/{id} {
       allow read: if true;
-      allow create, update: if hasPerm('classes.manage') || hasPerm('teachers.manage');
+      allow create, update: if hasPerm('classes.manage') || hasPerm('teachers.manage')
+        || (isTeacher() && request.auth.uid == id
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['phone', 'whatsapp', 'bio', 'email', 'updatedAt']));
+    }
+
+    // ---- In-app notifications (targeted by userId = Auth UID) ----
+    match /notifications/{id} {
+      allow create: if isStaff()
+        || (myRole() == 'parent'
+          && request.resource.data.type == 'absence_excuse'
+          && request.resource.data.role == 'teacher'
+          && request.resource.data.userId is string
+          && request.resource.data.read == false);
+      allow read, update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    // ---- Homework submissions (student/parent mark done; teacher/admin read) ----
+    match /homeworkSubmissions/{id} {
+      allow read: if isStaff()
+        || (isSignedIn() && (
+          get(/databases/$(database)/documents/students/$(resource.data.studentId)).data.studentUid == request.auth.uid
+          || get(/databases/$(database)/documents/students/$(resource.data.studentId)).data.guardianUid == request.auth.uid
+        ));
+      allow create, update: if isStaff()
+        || (isSignedIn()
+          && request.resource.data.studentId is string
+          && (
+            get(/databases/$(database)/documents/students/$(request.resource.data.studentId)).data.studentUid == request.auth.uid
+            || get(/databases/$(database)/documents/students/$(request.resource.data.studentId)).data.guardianUid == request.auth.uid
+          ));
+      allow delete: if isAdmin();
+    }
+
+    // ---- Meeting / cover requests from teachers ----
+    match /staffRequests/{id} {
+      allow create: if isTeacher()
+        && request.resource.data.teacherId == request.auth.uid
+        && request.resource.data.status == 'قيد المراجعة';
+      allow read: if isAdmin() || hasPerm('classes.manage') || hasPerm('students.manage')
+        || isReception()
+        || (isTeacher() && resource.data.teacherId == request.auth.uid);
+      allow update: if isAdmin() || hasPerm('classes.manage') || hasPerm('students.manage') || isReception();
+      allow delete: if isAdmin();
+    }
+
+    // ---- Class exam calendar (teacher submits, admin approves → visible) ----
+    match /classExams/{id} {
+      allow create: if isTeacher()
+        && request.resource.data.teacherId == request.auth.uid
+        && request.resource.data.status == 'قيد المراجعة';
+      allow read: if isStaff()
+        || (isSignedIn() && resource.data.status == 'معتمد')
+        || (isTeacher() && resource.data.teacherId == request.auth.uid);
+      allow update: if hasPerm('grades.approve') || hasPerm('classes.manage') || isAdmin()
+        || (isTeacher() && resource.data.teacherId == request.auth.uid
+          && resource.data.status == 'قيد المراجعة'
+          && request.resource.data.status == 'قيد المراجعة');
+      allow delete: if isAdmin();
     }
 
     // ---- Academic stages (admin-managed grade list for forms) ----

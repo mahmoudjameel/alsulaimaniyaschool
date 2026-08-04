@@ -42,6 +42,7 @@ const NAV_GROUPS = [
       { to: '/admin/enrollment', label: 'تسجيل الطلاب في الصفوف', icon: 'person_add', permission: 'enrollment.manage' },
       { to: '/admin/teachers', label: 'دليل المعلّمين', icon: 'co_present', permission: 'teachers.manage' },
       { to: '/admin/grades', label: 'الدرجات', icon: 'grade', permission: 'grades.approve' },
+      { to: '/admin/staff-hub', label: 'طلبات المعلّمين والاختبارات', icon: 'handshake', permission: 'classes.manage' },
       { to: '/admin/cms', label: 'الموقع والمحتوى', icon: 'newspaper', permission: 'cms.manage' },
     ],
   },

@@ -1,6 +1,7 @@
 import { addDoc, collection, doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { logActivity } from './activity';
+import { createNotification } from './notifications';
 
 export const gradeEntriesCol = collection(db, 'gradeEntries');
 
@@ -54,6 +55,19 @@ export async function approveGrade(entry, decidedBy) {
     summary: `اعتماد درجة «${entry.assessmentTitle}» لـ ${entry.studentName}`,
     targetType: 'gradeEntry', targetId: entry.id,
   });
+  if (entry.teacherId) {
+    await createNotification({
+      userId: entry.teacherId,
+      role: 'teacher',
+      type: 'grade_approved',
+      title: 'اعتُمدت درجة',
+      body: `«${entry.assessmentTitle}» لـ ${entry.studentName} — ${entry.score}/${entry.maxScore}`,
+      studentId: entry.studentId,
+      studentName: entry.studentName,
+      classId: entry.classId,
+      link: `/teacher/students/${entry.studentId}`,
+    });
+  }
 }
 
 export async function rejectGrade(entry, decidedBy) {
@@ -65,4 +79,17 @@ export async function rejectGrade(entry, decidedBy) {
     summary: `رفض درجة «${entry.assessmentTitle}» لـ ${entry.studentName}`,
     targetType: 'gradeEntry', targetId: entry.id,
   });
+  if (entry.teacherId) {
+    await createNotification({
+      userId: entry.teacherId,
+      role: 'teacher',
+      type: 'grade_rejected',
+      title: 'رُفضت درجة',
+      body: `«${entry.assessmentTitle}» لـ ${entry.studentName} — راجع الرصد أو عدّله.`,
+      studentId: entry.studentId,
+      studentName: entry.studentName,
+      classId: entry.classId,
+      link: `/teacher/grades?class=${entry.classId || ''}`,
+    });
+  }
 }

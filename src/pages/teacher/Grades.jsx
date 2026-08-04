@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { orderBy, where } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import SearchInput from '../../components/SearchInput';
@@ -7,9 +7,12 @@ import { ErrorBanner, EmptyRow } from '../../components/ui';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { useAuth } from '../../context/AuthContext';
 import { useMyClasses } from '../../hooks/useMyClasses';
-import { demoEnrollments } from '../../data/demo';
+import { demoEnrollments, demoStudents } from '../../data/demo';
 import { ASSESSMENT_TYPES, submitGrade } from '../../services/grades';
 import { filterByStudentSearch, matchesStudentSearch } from '../../lib/studentSearch';
+import { SCHOOL_NAME_AR } from '../../lib/constants';
+import { TEACHER_GRADE_TEMPLATE } from '../../lib/phone';
+import { openGuardianWhatsApp } from '../../lib/teacherWhatsApp';
 
 const STATUS_TONE = { 'قيد المراجعة': 'outline', 'معتمد': 'accent', 'مرفوض': 'neutral' };
 const TERMS = ['الفصل الأول', 'الفصل الثاني', ''];
@@ -55,6 +58,9 @@ export default function Grades() {
   const [maxScore, setMaxScore] = useState('100');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+  const [lastGrade, setLastGrade] = useState(null);
+
+  const { data: studentsDir } = useLiveOrDemo('students', [orderBy('name', 'asc')], demoStudents);
 
   const resolvedTitle = (assessmentTitle || '').trim()
     || (assessmentType === 'أخرى' ? '' : assessmentType);
@@ -87,7 +93,13 @@ export default function Grades() {
           score,
           maxScore,
         });
-        setMessage('أُرسلت الدرجة للإدارة بانتظار الاعتماد.');
+        setLastGrade({
+          studentId: student.studentId || student.id,
+          studentName: student.studentName || student.name,
+          assessmentTitle: resolvedTitle,
+          scoreLabel: `${score}/${maxScore}`,
+        });
+        setMessage('أُرسلت الدرجة للإدارة بانتظار الاعتماد — تظهر للطالب بعد الاعتماد.');
         setAssessmentTitle('');
         setScore('');
         setStudentId('');
@@ -171,11 +183,44 @@ export default function Grades() {
           <button type="submit" className="btn btn-primary btn-block" style={{ marginTop: 12 }} disabled={submitting || !myClasses.length}>
             <Icon name="send" size={14} /> {submitting ? 'جارٍ الإرسال…' : 'إرسال للاعتماد'}
           </button>
+          {lastGrade && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-block"
+              style={{ marginTop: 8 }}
+              onClick={() => {
+                const st = (studentsDir || []).find((s) => s.id === lastGrade.studentId);
+                const ok = openGuardianWhatsApp(
+                  st,
+                  TEACHER_GRADE_TEMPLATE(
+                    SCHOOL_NAME_AR,
+                    profile?.name,
+                    lastGrade.studentName,
+                    lastGrade.assessmentTitle,
+                    `${lastGrade.scoreLabel} (بانتظار اعتماد الإدارة)`,
+                  ),
+                );
+                if (!ok) window.alert('لا رقم واتساب لولي الأمر — حدّثه من الإدارة.');
+              }}
+            >
+              <Icon name="chat" size={14} /> إبلاغ ولي الأمر واتساب
+            </button>
+          )}
+          <Link
+            to={`/teacher/grade-sheet?class=${activeClassId}`}
+            className="btn btn-ghost btn-block"
+            style={{ marginTop: 8, textDecoration: 'none', fontSize: 13 }}
+          >
+            <Icon name="print" size={14} /> كشف درجات للطباعة
+          </Link>
         </form>
 
         <div className="card ah-table-wrap" style={{ padding: 0 }}>
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)' }}>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <div className="card-title" style={{ margin: 0 }}>درجات هذا الصف</div>
+            <Link to={`/teacher/grade-sheet?class=${activeClassId}`} className="btn btn-ghost" style={{ fontSize: 12, marginInlineStart: 'auto', textDecoration: 'none' }}>
+              طباعة الكشف
+            </Link>
           </div>
           <table className="table">
             <thead>

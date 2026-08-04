@@ -2,15 +2,25 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { orderBy } from 'firebase/firestore';
 import Icon from './Icon';
+import { useAuth } from '../context/AuthContext';
 import { useDocOrDemo, useLiveOrDemo } from '../hooks/useFirestore';
 import { demoAttendanceRecords, demoStudentDetail, demoStudents } from '../data/demo';
 import { computeAttendanceRate } from '../lib/attendance';
+import { SCHOOL_NAME_AR } from '../lib/constants';
+import {
+  ABSENCE_REMINDER_TEMPLATE,
+  GENERAL_MESSAGE_TEMPLATE,
+  TEACHER_FOLLOWUP_TEMPLATE,
+  TEACHER_NOTE_TEMPLATE,
+} from '../lib/phone';
+import { guardianWhatsAppTarget, openGuardianWhatsApp } from '../lib/teacherWhatsApp';
 
 function demoStudent(id) {
   return demoStudents.find((s) => s.id === id) || null;
 }
 
 export default function TeacherStudentPeek({ studentId, classId, classTitle, onClose }) {
+  const { profile } = useAuth();
   const { data: student, demo } = useDocOrDemo(
     studentId ? `students/${studentId}` : null,
     demoStudent(studentId),
@@ -50,6 +60,13 @@ export default function TeacherStudentPeek({ studentId, classId, classTitle, onC
     || student?.guardianPhoneLocal
     || '—';
   const guardianName = primaryGuardian?.name || student?.guardianName || '—';
+  const hasWa = !!guardianWhatsAppTarget(student, primaryGuardian);
+  const studentName = student?.name || 'الطالب';
+
+  const sendWa = (message) => {
+    const ok = openGuardianWhatsApp(student, message, primaryGuardian);
+    if (!ok) window.alert('لا يوجد رقم واتساب لولي الأمر. حدّثه من ملف الطالب في الإدارة.');
+  };
 
   if (!studentId) return null;
 
@@ -70,7 +87,7 @@ export default function TeacherStudentPeek({ studentId, classId, classTitle, onC
         </div>
 
         <div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>{student?.name || 'طالب'}</div>
+          <div style={{ fontSize: 20, fontWeight: 700 }}>{studentName}</div>
           <div style={{ fontSize: 13, color: 'var(--color-neutral-600)', marginTop: 4 }}>
             {[student?.displayId, student?.grade || student?.stageLabel, classTitle].filter(Boolean).join(' · ')}
             {demo ? ' · عرض' : ''}
@@ -94,6 +111,41 @@ export default function TeacherStudentPeek({ studentId, classId, classTitle, onC
           </div>
         </div>
 
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ fontSize: 12 }}
+            disabled={!hasWa}
+            onClick={() => sendWa(GENERAL_MESSAGE_TEMPLATE(SCHOOL_NAME_AR, guardianName))}
+          >
+            <Icon name="chat" size={14} /> واتساب ولي الأمر
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: 12 }}
+            disabled={!hasWa}
+            onClick={() => sendWa(ABSENCE_REMINDER_TEMPLATE(SCHOOL_NAME_AR, studentName, ''))}
+          >
+            تنبيه غياب
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: 12 }}
+            disabled={!hasWa}
+            onClick={() => sendWa(TEACHER_FOLLOWUP_TEMPLATE(
+              SCHOOL_NAME_AR,
+              profile?.name,
+              studentName,
+              rate != null && rate < 75 ? `نسبة الحضور الحالية ${rate}%.` : 'نرجو المتابعة الأكاديمية.',
+            ))}
+          >
+            متابعة
+          </button>
+        </div>
+
         <div>
           <div className="card-title" style={{ fontSize: 15, marginBottom: 8 }}>آخر الملاحظات</div>
           {recentNotes.length === 0 && (
@@ -111,8 +163,20 @@ export default function TeacherStudentPeek({ studentId, classId, classTitle, onC
                   lineHeight: 1.6,
                 }}
               >
-                <div style={{ fontSize: 11, color: 'var(--color-neutral-500)', marginBottom: 4 }}>
-                  {[n.kind, n.sentiment].filter(Boolean).join(' · ')}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, color: 'var(--color-neutral-500)' }}>
+                    {[n.kind, n.sentiment].filter(Boolean).join(' · ')}
+                  </span>
+                  {hasWa && n.note && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      style={{ fontSize: 11, padding: '2px 8px', marginInlineStart: 'auto' }}
+                      onClick={() => sendWa(TEACHER_NOTE_TEMPLATE(SCHOOL_NAME_AR, profile?.name, studentName, n.note))}
+                    >
+                      واتساب
+                    </button>
+                  )}
                 </div>
                 {n.note || n.body || '—'}
               </div>
@@ -122,7 +186,15 @@ export default function TeacherStudentPeek({ studentId, classId, classTitle, onC
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Link
-            to={`/teacher/observations?class=${classId || ''}`}
+            to={`/teacher/students/${studentId}`}
+            className="btn btn-primary"
+            style={{ fontSize: 12, textDecoration: 'none' }}
+            onClick={onClose}
+          >
+            ملف الطالب الكامل
+          </Link>
+          <Link
+            to={`/teacher/observations?class=${classId || ''}&student=${studentId || ''}`}
             className="btn btn-secondary"
             style={{ fontSize: 12, textDecoration: 'none' }}
             onClick={onClose}
@@ -137,7 +209,7 @@ export default function TeacherStudentPeek({ studentId, classId, classTitle, onC
           >
             رصد درجة
           </Link>
-          <button type="button" className="btn btn-primary" onClick={onClose} style={{ marginInlineStart: 'auto' }}>
+          <button type="button" className="btn btn-ghost" onClick={onClose} style={{ marginInlineStart: 'auto' }}>
             إغلاق
           </button>
         </div>

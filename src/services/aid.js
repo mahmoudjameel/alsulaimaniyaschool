@@ -2,6 +2,7 @@ import { addDoc, collection, doc, getDoc, getDocs, increment, query, runTransact
 import { db } from '../firebase/config';
 import { CURRENT_ACADEMIC_YEAR, shekelsToMinorUnits } from '../lib/constants';
 import { logActivity } from './activity';
+import { notifyMany } from './notifications';
 
 export const absenceExcusesCol = collection(db, 'absenceExcuses');
 
@@ -361,7 +362,7 @@ function shiftPeriod(yyyyMm, addMonths) {
 }
 
 export async function submitAbsenceExcuse({
-  studentId, studentName, guardianUid, guardianName, date, reason, note,
+  studentId, studentName, guardianUid, guardianName, date, reason, note, teacherIds = [],
 }) {
   await addDoc(absenceExcusesCol, {
     studentId,
@@ -371,8 +372,18 @@ export async function submitAbsenceExcuse({
     date,
     reason: reason || 'مبرَّر',
     note: (note || '').trim() || null,
+    teacherIds: teacherIds || [],
     status: 'قيد المراجعة',
     createdAt: serverTimestamp(),
+  });
+  await notifyMany(teacherIds, {
+    role: 'teacher',
+    type: 'absence_excuse',
+    title: 'تبرير غياب من ولي الأمر',
+    body: `${studentName || 'طالب'} — ${date}${reason ? ` · ${reason}` : ''} (بانتظار الإدارة)`,
+    studentId,
+    studentName,
+    link: studentId ? `/teacher/students/${studentId}` : '/teacher/inbox',
   });
 }
 
@@ -387,6 +398,27 @@ export async function reviewAbsenceExcuse(excuseId, { decision, reviewer }) {
     reviewedAt: serverTimestamp(),
     reviewedBy: reviewer?.uid || null,
     reviewedByName: reviewer?.name || null,
+  });
+
+  // Notify class teachers of the decision
+  const teacherIds = data.teacherIds || [];
+  if (teacherIds.length === 0 && data.studentId && data.date) {
+    const recSnap = await getDocs(query(
+      collection(db, 'students', data.studentId, 'attendanceRecords'),
+      where('date', '==', data.date),
+    ));
+    recSnap.docs.forEach((r) => {
+      if (r.data().teacherId) teacherIds.push(r.data().teacherId);
+    });
+  }
+  await notifyMany(teacherIds, {
+    role: 'teacher',
+    type: 'absence_excuse',
+    title: decision === 'approve' ? 'قُبل تبرير غياب' : 'رُفض تبرير غياب',
+    body: `${data.studentName || 'طالب'} — ${data.date}`,
+    studentId: data.studentId,
+    studentName: data.studentName,
+    link: data.studentId ? `/teacher/students/${data.studentId}` : '/teacher/inbox',
   });
 
   // On approve: mark matching attendance rows as excused so parent/student portals match

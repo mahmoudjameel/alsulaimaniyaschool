@@ -14,9 +14,15 @@ export default function TeacherClasses() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <ErrorBanner>{error && 'تعذّر تحميل الصفوف.'}</ErrorBanner>
       <p style={{ margin: 0, fontSize: 14, color: 'var(--color-neutral-700)', lineHeight: 1.7 }}>
-        الصفوف المسندة إليك من الإدارة. افتح الصف لعرض كشف الطلاب والعمل على الحضور والدرجات.
+        الصفوف المسندة إليك من الإدارة. افتح الصف لكشف الطلاب، أو استخدم «كل طلابي» لعرض الجميع عبر الفصول.
         {demo ? ' (عرض توضيحي)' : ''}
       </p>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <Link to="/teacher/students" className="btn btn-primary" style={{ textDecoration: 'none', fontSize: 13 }}>
+          <Icon name="group" size={15} /> كل طلابي
+        </Link>
+      </div>
 
       {myClasses.length === 0 && (
         <div className="card" style={{ fontSize: 13, color: 'var(--color-neutral-500)' }}>

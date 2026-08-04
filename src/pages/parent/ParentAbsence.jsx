@@ -178,6 +178,12 @@ function ExcuseModal({ childrenList, demo, profile, onClose }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const student = childrenList.find((c) => c.id === studentId);
+  const { data: studentClasses } = useLiveOrDemo(
+    studentId ? `students/${studentId}/classes` : '__none__',
+    [],
+    (demoStudentDetail[studentId] || demoStudentDetail.s1)?.classes || [],
+    studentId || '__none__',
+  );
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -186,6 +192,7 @@ function ExcuseModal({ childrenList, demo, profile, onClose }) {
     setSubmitting(true);
     setError('');
     try {
+      const teacherIds = [...new Set((studentClasses || []).map((c) => c.teacherId).filter(Boolean))];
       await submitAbsenceExcuse({
         studentId,
         studentName: student?.name,
@@ -194,6 +201,7 @@ function ExcuseModal({ childrenList, demo, profile, onClose }) {
         date,
         reason,
         note,
+        teacherIds,
       });
       onClose();
     } catch {

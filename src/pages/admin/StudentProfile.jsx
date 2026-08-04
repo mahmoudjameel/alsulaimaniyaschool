@@ -4,6 +4,7 @@ import { orderBy } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import BackButton from '../../components/BackButton';
 import { EmptyRow, ErrorBanner } from '../../components/ui';
+import { useAuth } from '../../context/AuthContext';
 import { useDocOrDemo, useLiveOrDemo } from '../../hooks/useFirestore';
 import { demoStudents, demoStudentDetail, demoAttendanceRecords } from '../../data/demo';
 import { formatILS, SCHOOL_NAME_AR } from '../../lib/constants';
@@ -12,6 +13,7 @@ import { computeAttendanceRate, computeMonthlyAttendance } from '../../lib/atten
 import EditStudentModal from '../../modals/EditStudentModal';
 import { FEE_REMINDER_TEMPLATE, GENERAL_MESSAGE_TEMPLATE, openWhatsAppChat, parseStoredPhone } from '../../lib/phone';
 import { studentsListPath, staffPortalBase } from '../../lib/portalPaths';
+import { sendAdminStudentAlert } from '../../services/staffRequests';
 
 const TABS = [
   { id: 'overview', label: 'نظرة عامة' }, { id: 'guardians', label: 'أولياء الأمور' },
@@ -23,9 +25,13 @@ const TABS = [
 export default function StudentProfile() {
   const { id } = useParams();
   const { pathname } = useLocation();
+  const { profile } = useAuth();
   const portalBase = staffPortalBase(pathname);
   const [tab, setTab] = useState('overview');
   const [editing, setEditing] = useState(false);
+  const [alertText, setAlertText] = useState('');
+  const [alertMsg, setAlertMsg] = useState('');
+  const [alertBusy, setAlertBusy] = useState(false);
 
   const { data: student, demo } = useDocOrDemo(`students/${id}`, demoStudents.find((s) => s.id === id) || demoStudents[0]);
   const detail = demo ? (demoStudentDetail[id] || demoStudentDetail.s1) : null;
@@ -95,6 +101,53 @@ export default function StudentProfile() {
           <button type="button" className="btn btn-primary" style={{ fontSize: 13 }} onClick={() => window.open(`${portalBase}/students/${id}/report-card`, '_blank')}>
             <Icon name="print" size={14} /> طباعة كشف العلامات
           </button>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 10 }}>
+          <input
+            className="input"
+            style={{ flex: 1, minWidth: 200 }}
+            value={alertText}
+            onChange={(e) => setAlertText(e.target.value)}
+            placeholder="تنبيه سريع لمعلّمي صفوف هذا الطالب…"
+          />
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: 13 }}
+            disabled={alertBusy || !alertText.trim()}
+            onClick={async () => {
+              const teacherIds = [...new Set((classesList.data || []).map((c) => c.teacherId).filter(Boolean))];
+              if (teacherIds.length === 0) {
+                setAlertMsg('لا معلّمين مرتبطين بصفوف الطالب.');
+                return;
+              }
+              if (demo) {
+                setAlertMsg('وضع العرض: صِل Firebase.');
+                return;
+              }
+              setAlertBusy(true);
+              setAlertMsg('');
+              try {
+                await sendAdminStudentAlert({
+                  teacherIds,
+                  adminId: profile?.id,
+                  adminName: profile?.name,
+                  studentId: id,
+                  studentName: student.name,
+                  message: alertText.trim(),
+                });
+                setAlertMsg(`أُرسل لمعلّمين: ${teacherIds.length}`);
+                setAlertText('');
+              } catch {
+                setAlertMsg('تعذّر الإرسال.');
+              } finally {
+                setAlertBusy(false);
+              }
+            }}
+          >
+            <Icon name="campaign" size={14} /> تنبيه المعلّمين
+          </button>
+          {alertMsg && <span style={{ fontSize: 12, color: 'var(--color-accent-700)' }}>{alertMsg}</span>}
         </div>
       </div>
 

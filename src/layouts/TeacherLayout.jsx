@@ -6,31 +6,47 @@ import { useAuth } from '../context/AuthContext';
 
 const NAV_PRIMARY = [
   { to: '/teacher', end: true, label: 'لوحتي', icon: 'dashboard' },
+  { to: '/teacher/inbox', label: 'إشعاراتي', icon: 'notifications' },
   { to: '/teacher/schedule', label: 'جدول الحصص', icon: 'calendar_month' },
-  { to: '/teacher/classes', label: 'صفوفي وطلابي', icon: 'school' },
+  { to: '/teacher/classes', label: 'صفوفي', icon: 'school' },
+  { to: '/teacher/students', label: 'كل طلابي', icon: 'group' },
   { to: '/teacher/attendance', label: 'الحضور والغياب', icon: 'fact_check' },
   { to: '/teacher/attendance-report', label: 'تقرير الحضور', icon: 'analytics' },
   { to: '/teacher/grades', label: 'الدرجات', icon: 'grade' },
+  { to: '/teacher/bulk-grades', label: 'رصد جماعي', icon: 'grid_view' },
+  { to: '/teacher/grade-sheet', label: 'كشف درجات', icon: 'print' },
+  { to: '/teacher/exams', label: 'تقويم اختبارات', icon: 'event' },
+  { to: '/teacher/follow-up', label: 'متابعة الطلاب', icon: 'warning' },
   { to: '/teacher/diary', label: 'دفتر اليوم', icon: 'edit_note' },
   { to: '/teacher/observations', label: 'الملاحظات', icon: 'chat' },
+  { to: '/teacher/requests', label: 'طلبات واجتماعات', icon: 'handshake' },
 ];
 
 const NAV_EXTRA = [
   { to: '/teacher/builder', label: 'دروس الصف', icon: 'menu_book' },
   { to: '/teacher/quiz', label: 'اختبارات', icon: 'checklist' },
+  { to: '/teacher/profile', label: 'ملفي', icon: 'person' },
 ];
 
 const TITLES = {
   '/teacher': 'لوحة المعلّم',
+  '/teacher/inbox': 'إشعاراتي',
   '/teacher/schedule': 'جدول الحصص',
-  '/teacher/classes': 'صفوفي وطلابي',
+  '/teacher/classes': 'صفوفي',
+  '/teacher/students': 'كل طلابي',
   '/teacher/attendance': 'الحضور والغياب',
   '/teacher/attendance-report': 'تقرير الحضور',
   '/teacher/grades': 'الدرجات',
+  '/teacher/bulk-grades': 'رصد درجات جماعي',
+  '/teacher/grade-sheet': 'كشف درجات للطباعة',
+  '/teacher/exams': 'تقويم اختبارات الصف',
+  '/teacher/follow-up': 'متابعة الطلاب',
   '/teacher/diary': 'دفتر اليوم',
   '/teacher/observations': 'الملاحظات',
+  '/teacher/requests': 'طلبات واجتماعات',
   '/teacher/builder': 'دروس الصف',
   '/teacher/quiz': 'الاختبارات',
+  '/teacher/profile': 'ملفي',
 };
 
 function greetingForNow() {
@@ -54,6 +70,8 @@ export default function TeacherLayout() {
   }, [menuOpen]);
 
   const title = useMemo(() => {
+    if (pathname.includes('/report')) return 'تقرير طالب للطباعة';
+    if (pathname.startsWith('/teacher/students/') && pathname !== '/teacher/students') return 'ملف الطالب';
     if (pathname.startsWith('/teacher/classes/') && pathname !== '/teacher/classes') return 'تفاصيل الصف';
     return TITLES[pathname] || 'لوحة المعلّم';
   }, [pathname]);
@@ -118,21 +136,14 @@ export default function TeacherLayout() {
           <button type="button" className="panel-menu-btn" aria-label="فتح القائمة" onClick={() => setMenuOpen(true)}>
             <Icon name="menu" size={22} />
           </button>
-          <div style={{ minWidth: 0 }}>
-            <h3 className="panel-page-title" style={{ margin: 0 }}>{title}</h3>
-            {pathname === '/teacher' && (
-              <div style={{ fontSize: 12, color: 'var(--color-neutral-500)', marginTop: 2 }}>
-                {greetingForNow()}، أ. {firstName}
-              </div>
-            )}
-          </div>
-          <div className="panel-topbar-actions ah-hide-sm">
-            <button type="button" className="btn btn-secondary" style={{ fontSize: 13 }} onClick={() => navigate('/teacher/attendance')}>
-              حضور اليوم
-            </button>
+          <div>
+            <div className="panel-topbar-title">{title}</div>
+            <div className="panel-topbar-sub">{greetingForNow()} {firstName}</div>
           </div>
         </header>
-        <div className="panel-content"><Outlet /></div>
+        <div className="panel-content">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
