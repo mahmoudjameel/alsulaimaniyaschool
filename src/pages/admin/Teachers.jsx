@@ -27,7 +27,7 @@ export default function Teachers() {
 
   const rows = useMemo(() => teachers.map((t) => {
     const theirClasses = classes.filter((c) => c.teacherId === t.id);
-    const totalStudents = theirClasses.reduce((sum, c) => sum + Number(c.students ?? c.studentsCount ?? 0), 0);
+    const totalStudents = theirClasses.reduce((sum, c) => sum + Number(c.studentsCount ?? c.students ?? 0), 0);
     const totalMinutes = theirClasses.reduce((sum, c) => sum + weeklyMinutes(c.schedule), 0);
     const shifts = [...new Set(theirClasses.map((c) => c.shift).filter(Boolean))];
     return { ...t, classesCount: theirClasses.length, totalStudents, weeklyHours: Math.round(totalMinutes / 60 * 10) / 10, shifts };

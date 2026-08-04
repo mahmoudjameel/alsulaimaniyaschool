@@ -46,7 +46,7 @@ export default function Classes() {
               {c.shift && <span className="tag tag-neutral">{c.shift}</span>}
             </div>
             <div className="card-title" style={{ fontSize: 16 }}>{c.title}</div>
-            <div className="card-meta">{c.grade ? `${c.grade} · ` : ''}{c.teacher} · {c.lessons ?? c.lessonsCount ?? 0} درساً · {c.students ?? c.studentsCount ?? 0} طالباً</div>
+            <div className="card-meta">{c.grade ? `${c.grade} · ` : ''}{c.teacher} · {c.lessons ?? c.lessonsCount ?? 0} درساً · {c.studentsCount ?? c.students ?? 0} طالباً</div>
           </button>
         ))}
       </div>

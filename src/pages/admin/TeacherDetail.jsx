@@ -14,7 +14,7 @@ export default function TeacherDetail() {
   const { data: classes } = useLiveOrDemo('classes', [orderBy('createdAt', 'desc')], demoClasses);
 
   const theirClasses = useMemo(() => classes.filter((c) => c.teacherId === id), [classes, id]);
-  const totalStudents = theirClasses.reduce((sum, c) => sum + Number(c.students ?? c.studentsCount ?? 0), 0);
+  const totalStudents = theirClasses.reduce((sum, c) => sum + Number(c.studentsCount ?? c.students ?? 0), 0);
 
   if (!teacher) return <ErrorBanner>تعذّر العثور على هذا المعلّم.</ErrorBanner>;
 
@@ -48,7 +48,7 @@ export default function TeacherDetail() {
               {c.shift && <span className="tag tag-neutral">{c.shift}</span>}
             </div>
             <div className="card-title" style={{ fontSize: 15 }}>{c.title}</div>
-            <div className="card-meta">{c.grade} · {c.students ?? c.studentsCount ?? 0} طالباً</div>
+            <div className="card-meta">{c.grade} · {c.studentsCount ?? c.students ?? 0} طالباً</div>
             {(c.schedule || []).map((s, i) => (
               <div key={i} style={{ fontSize: 11, color: 'var(--color-neutral-500)' }} dir="ltr">{s.day} · {s.start}–{s.end}</div>
             ))}

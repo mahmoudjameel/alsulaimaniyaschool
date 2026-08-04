@@ -48,7 +48,7 @@ export default function TeacherClassDetail() {
         <div style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>
           {[cls?.subject, cls?.grade, cls?.shift].filter(Boolean).join(' · ')}
           {' · '}
-          {enrolled.length || Number(cls?.studentsCount ?? 0)} طالب
+          {enrolled.length} طالب
           {demo ? ' · عرض توضيحي' : ''}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>

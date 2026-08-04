@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Modal from '../components/Modal';
 import { Field } from '../components/ui';
-import { createClass } from '../services/academics';
+import { updateClass, syncClassStudentsCount } from '../services/academics';
 import { logActivity } from '../services/activity';
 import { useAuth } from '../context/AuthContext';
 import { useAssignableTeachers } from '../hooks/useAssignableTeachers';
@@ -12,17 +12,21 @@ const VISIBILITIES = ['المدرسة', 'عام', 'دعوة فقط'];
 const SHIFTS = ['صباحي', 'مسائي'];
 const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 
-export default function NewClassModal({ onClose, demo }) {
+export default function EditClassModal({ cls, onClose, demo }) {
   const { profile } = useAuth();
   const { teachers } = useAssignableTeachers();
   const { stages, labels } = useAcademicStages();
-  const [title, setTitle] = useState('');
-  const [subject, setSubject] = useState(SUBJECTS[0]);
-  const [teacherId, setTeacherId] = useState('');
-  const [grade, setGrade] = useState('');
-  const [shift, setShift] = useState(SHIFTS[0]);
-  const [visibility, setVisibility] = useState(VISIBILITIES[0]);
-  const [schedule, setSchedule] = useState([{ day: DAYS[0], start: '08:00', end: '08:45' }]);
+  const [title, setTitle] = useState(cls?.title || '');
+  const [subject, setSubject] = useState(cls?.subject || SUBJECTS[0]);
+  const [teacherId, setTeacherId] = useState(cls?.teacherId || '');
+  const [grade, setGrade] = useState(cls?.grade || '');
+  const [shift, setShift] = useState(cls?.shift || SHIFTS[0]);
+  const [visibility, setVisibility] = useState(cls?.visibility || VISIBILITIES[0]);
+  const [schedule, setSchedule] = useState(
+    Array.isArray(cls?.schedule) && cls.schedule.length
+      ? cls.schedule.map((s) => ({ day: s.day || DAYS[0], start: s.start || '08:00', end: s.end || '08:45' }))
+      : [{ day: DAYS[0], start: '08:00', end: '08:45' }],
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -30,57 +34,57 @@ export default function NewClassModal({ onClose, demo }) {
     if (!grade && labels[0]) setGrade(labels[0]);
   }, [labels, grade]);
 
-  useEffect(() => {
-    if (!teacherId && teachers.length) {
-      const preferred = teachers.find((t) => t.login) || teachers[0];
-      if (preferred) setTeacherId(preferred.id);
-    }
-  }, [teachers, teacherId]);
-
   const updateSlot = (i, patch) => setSchedule((s) => s.map((row, j) => (j === i ? { ...row, ...patch } : row)));
   const addSlot = () => setSchedule((s) => [...s, { day: DAYS[0], start: '08:00', end: '08:45' }]);
   const removeSlot = (i) => setSchedule((s) => s.filter((_, j) => j !== i));
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (demo) { setError('وضع العرض التوضيحي: صِل مشروع Firebase لإنشاء الصفوف فعلياً.'); return; }
+    if (demo) { setError('وضع العرض: صِل Firebase لحفظ التعديل.'); return; }
+    if (!cls?.id) return;
     const teacher = teachers.find((t) => t.id === teacherId);
-    if (!teacher) { setError('اختر معلّماً.'); return; }
-    if (!teacher.login) {
-      setError('اختر معلّماً لديه حساب دخول (من دعوة المستخدمين) حتى يظهر الصف في بوابة المعلّم.');
-      return;
-    }
+    if (!teacher) { setError('اختر معلّماً لديه حساب دخول إن أمكن.'); return; }
     setSubmitting(true);
     setError('');
     try {
-      const classId = await createClass({
-        title, subject, teacherId: teacher.id, teacherName: teacher.name, grade, shift, visibility, schedule,
+      await updateClass(cls.id, {
+        title, subject, grade, shift, visibility, schedule,
+        teacherId: teacher.id,
+        teacherName: teacher.name,
       });
+      await syncClassStudentsCount(cls.id);
       await logActivity({
-        type: 'class_created', actorUid: profile?.id, actorName: profile?.name, actorRole: profile?.role,
-        summary: `إنشاء صفّ جديد: ${title} (${subject}) — ${teacher.name}`, targetType: 'class', targetId: classId,
+        type: 'class_updated',
+        actorUid: profile?.id,
+        actorName: profile?.name,
+        actorRole: profile?.role,
+        summary: `تعديل صفّ: ${title} — معلّم ${teacher.name}`,
+        targetType: 'class',
+        targetId: cls.id,
       });
       onClose();
     } catch {
-      setError('تعذّر إنشاء الصف. حاول مجدداً.');
+      setError('تعذّر حفظ التعديل.');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Modal title="إنشاء صفّ جديد" onClose={onClose} onSubmit={onSubmit} submitLabel="إنشاء الصف" submitting={submitting} error={error} width={560}>
+    <Modal title="تعديل الصف والجدول" onClose={onClose} onSubmit={onSubmit} submitLabel="حفظ التعديلات" submitting={submitting} error={error} width={560}>
       <div className="dialog-body">
-        عيّن معلّماً بحساب دخول، وحدّد جدول الحصص — يظهر مباشرة في بوابة المعلّم.
+        عيّن معلّماً بحساب دخول حتى يظهر الصف في بوابة المعلّم. الجدول يغذي «جدول الحصص» عند المعلّم.
       </div>
-      <Field label="عنوان الصف"><input className="input" placeholder="مثال: القراءة التفاعلية" value={title} onChange={(e) => setTitle(e.target.value)} required /></Field>
+      <Field label="عنوان الصف">
+        <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required />
+      </Field>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="المادة">
           <select className="input" value={subject} onChange={(e) => setSubject(e.target.value)}>
             {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
           </select>
         </Field>
-        <Field label="المعلّم (حساب دخول)">
+        <Field label="المعلّم">
           <select className="input" value={teacherId} onChange={(e) => setTeacherId(e.target.value)} required>
             <option value="" disabled>اختر معلّماً…</option>
             {teachers.map((t) => (
@@ -91,16 +95,25 @@ export default function NewClassModal({ onClose, demo }) {
           </select>
         </Field>
       </div>
+      {teacherId && teachers.find((t) => t.id === teacherId && !t.login) && (
+        <div style={{ fontSize: 12, color: 'var(--color-accent-2-700)', lineHeight: 1.6 }}>
+          هذا الملف من الدليل فقط وليس حساب دخول — الصف لن يظهر في بوابة المعلّم. أنشئ حساب معلّم من «المستخدمون» ثم عيّنه هنا.
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="الصف الدراسي">
           <select className="input" value={grade} onChange={(e) => setGrade(e.target.value)}>
             {stages.map((s) => <option key={s.id} value={s.labelAr}>{s.labelAr}</option>)}
+            {grade && !stages.some((s) => s.labelAr === grade) && <option value={grade}>{grade}</option>}
           </select>
         </Field>
         <Field label="الدوام">
           <div className="seg" style={{ marginTop: 2 }}>
             {SHIFTS.map((s) => (
-              <label key={s} className="seg-opt"><input type="radio" name="shift" checked={shift === s} onChange={() => setShift(s)} /><span>{s}</span></label>
+              <label key={s} className="seg-opt">
+                <input type="radio" name="edit-shift" checked={shift === s} onChange={() => setShift(s)} />
+                <span>{s}</span>
+              </label>
             ))}
           </div>
         </Field>
@@ -108,7 +121,10 @@ export default function NewClassModal({ onClose, demo }) {
       <Field label="الظهور">
         <div className="seg" style={{ marginTop: 2 }}>
           {VISIBILITIES.map((v) => (
-            <label key={v} className="seg-opt"><input type="radio" name="vis" checked={visibility === v} onChange={() => setVisibility(v)} /><span>{v}</span></label>
+            <label key={v} className="seg-opt">
+              <input type="radio" name="edit-vis" checked={visibility === v} onChange={() => setVisibility(v)} />
+              <span>{v}</span>
+            </label>
           ))}
         </div>
       </Field>

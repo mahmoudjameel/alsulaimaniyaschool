@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { orderBy } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import BackButton from '../../components/BackButton';
@@ -8,18 +8,33 @@ import { EmptyRow, ErrorBanner } from '../../components/ui';
 import { useDocOrDemo, useLiveOrDemo } from '../../hooks/useFirestore';
 import { demoClasses, demoEnrollments, demoTeacherProfiles, demoAttendanceSessions } from '../../data/demo';
 import { filterByStudentSearch } from '../../lib/studentSearch';
+import EditClassModal from '../../modals/EditClassModal';
+import { syncClassStudentsCount } from '../../services/academics';
 
 export default function ClassDetail() {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const { data: cls, error } = useDocOrDemo(`classes/${id}`, demoClasses.find((c) => c.id === id) || demoClasses[0]);
+  const { data: cls, error, demo } = useDocOrDemo(`classes/${id}`, demoClasses.find((c) => c.id === id) || demoClasses[0]);
   const { data: enrolled } = useLiveOrDemo(`classes/${id}/enrollments`, [orderBy('enrolledAt', 'asc')], demoEnrollments[id] || []);
   const { data: teachers } = useLiveOrDemo('teacherProfiles', [], demoTeacherProfiles);
   const { data: sessions } = useLiveOrDemo(`classes/${id}/attendanceSessions`, [orderBy('date', 'desc')], demoAttendanceSessions[id] || []);
+  const { data: dayLogs } = useLiveOrDemo(`classes/${id}/dayLogs`, [orderBy('date', 'desc')], []);
   const [openDate, setOpenDate] = useState(null);
   const [search, setSearch] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
   const teacher = teachers.find((t) => t.id === cls?.teacherId);
   const enrolledView = useMemo(() => filterByStudentSearch(enrolled, search), [enrolled, search]);
+  const realCount = enrolled.length;
+
+  const onSyncCount = async () => {
+    if (demo || !id) return;
+    try {
+      const n = await syncClassStudentsCount(id);
+      setSyncMsg(`تم مزامنة العدد: ${n} طالب`);
+    } catch {
+      setSyncMsg('تعذّرت المزامنة.');
+    }
+  };
 
   if (!cls) return <ErrorBanner>تعذّر العثور على هذا الصف.</ErrorBanner>;
 
@@ -34,6 +49,10 @@ export default function ClassDetail() {
         {cls.grade && <span className="tag tag-neutral">{cls.grade}</span>}
         {cls.shift && <span className="tag tag-neutral">{cls.shift}</span>}
         <span className={`tag tag-${cls.tone || 'neutral'}`}>{cls.visibility}</span>
+        <span className="tag tag-accent">{realCount} طالب مسجّل</span>
+        <button type="button" className="btn btn-primary" style={{ fontSize: 13, marginInlineStart: 'auto' }} onClick={() => setEditing(true)}>
+          <Icon name="edit" size={14} /> تعديل الصف والجدول
+        </button>
       </div>
 
       <div className="ah-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 16, alignItems: 'start' }}>
@@ -41,21 +60,26 @@ export default function ClassDetail() {
           <div className="card-title" style={{ marginBottom: 8 }}>المعلّم</div>
           {teacher ? (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--color-accent-100)', color: 'var(--color-accent-800)', display: 'grid', placeItems: 'center', fontFamily: 'var(--font-heading)', fontSize: 20, flex: 'none' }}>{teacher.initial}</div>
+              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--color-accent-100)', color: 'var(--color-accent-800)', display: 'grid', placeItems: 'center', fontFamily: 'var(--font-heading)', fontSize: 20, flex: 'none' }}>{teacher.initial || (teacher.name || 'م').charAt(0)}</div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 15 }}>{teacher.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--gold)' }}>{teacher.subject}</div>
               </div>
             </div>
           ) : (
-            <div style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>{cls.teacher}</div>
+            <div style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>{cls.teacher || 'غير معيّن'}</div>
+          )}
+          {!cls.teacherId && (
+            <div style={{ fontSize: 12, color: 'var(--color-accent-2-700)', marginTop: 8 }}>
+              لا يوجد teacherId — الصف لن يظهر في بوابة المعلّم. عدّل الصف وعيّن معلّماً بحساب دخول.
+            </div>
           )}
           {teacher && (
             <Link to={`/admin/teachers/${teacher.id}`} className="btn btn-ghost" style={{ fontSize: 12, marginTop: 10, alignSelf: 'flex-start', textDecoration: 'none' }}>عرض ملف المعلّم ←</Link>
           )}
           <hr className="hr" />
           <div className="card-title" style={{ marginBottom: 8, fontSize: 15 }}>جدول الحصص الأسبوعي</div>
-          {(cls.schedule || []).length === 0 && <div style={{ fontSize: 13, color: 'var(--color-neutral-500)' }}>لم يُحدَّد جدول بعد.</div>}
+          {(cls.schedule || []).length === 0 && <div style={{ fontSize: 13, color: 'var(--color-neutral-500)' }}>لم يُحدَّد جدول بعد — عدّل الصف لإضافته.</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {(cls.schedule || []).map((s, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}>
@@ -64,6 +88,12 @@ export default function ClassDetail() {
               </div>
             ))}
           </div>
+          {!demo && (
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 12, marginTop: 12, alignSelf: 'flex-start' }} onClick={onSyncCount}>
+              مزامنة عدد الطلاب من التسجيل
+            </button>
+          )}
+          {syncMsg && <div style={{ fontSize: 12, color: 'var(--color-accent-700)', marginTop: 6 }}>{syncMsg}</div>}
         </div>
 
         <div className="card" style={{ padding: 0 }}>
@@ -90,6 +120,25 @@ export default function ClassDetail() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="card" style={{ padding: 0 }}>
+        <div className="card-title" style={{ padding: '14px 14px 0' }}>دفتر اليوم (من بوابة المعلّم)</div>
+        <table className="table" style={{ marginTop: 8 }}>
+          <thead><tr><th>التاريخ</th><th>الموضوع</th><th>الواجب</th><th>تنبيه</th><th>المعلّم</th></tr></thead>
+          <tbody>
+            {dayLogs.length === 0 && <EmptyRow colSpan={5}>لا إدخالات في دفتر اليوم بعد.</EmptyRow>}
+            {dayLogs.slice(0, 30).map((d) => (
+              <tr key={d.id || d.date}>
+                <td className="ah-tabnum">{d.date || d.id}</td>
+                <td>{d.topic || '—'}</td>
+                <td style={{ fontSize: 13 }}>{d.homework || '—'}</td>
+                <td style={{ fontSize: 13 }}>{d.notice || '—'}</td>
+                <td>{d.teacherName || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <div className="card" style={{ padding: 0 }}>
@@ -131,6 +180,14 @@ export default function ClassDetail() {
           </tbody>
         </table>
       </div>
+
+      {editing && (
+        <EditClassModal
+          cls={cls}
+          demo={demo}
+          onClose={() => setEditing(false)}
+        />
+      )}
     </div>
   );
 }

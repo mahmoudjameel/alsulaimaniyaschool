@@ -1,5 +1,5 @@
 import {
-  addDoc, collection, deleteDoc, doc, getDoc, increment, orderBy, query, serverTimestamp, setDoc, updateDoc,
+  addDoc, collection, deleteDoc, doc, getDoc, getDocs, increment, orderBy, query, serverTimestamp, setDoc, updateDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
@@ -21,6 +21,32 @@ export async function createClass({ title, subject, teacherId, teacherName, grad
     createdAt: serverTimestamp(),
   });
   return ref.id;
+}
+
+/** Admin updates class meta, assigned teacher, and/or weekly schedule. */
+export async function updateClass(classId, patch = {}) {
+  const allowed = {};
+  if (patch.title != null) allowed.title = patch.title;
+  if (patch.subject != null) allowed.subject = patch.subject;
+  if (patch.grade != null) allowed.grade = patch.grade;
+  if (patch.shift != null) allowed.shift = patch.shift;
+  if (patch.visibility != null) allowed.visibility = patch.visibility;
+  if (patch.teacherId !== undefined) allowed.teacherId = patch.teacherId || null;
+  if (patch.teacherName != null) allowed.teacher = patch.teacherName;
+  if (patch.schedule != null) allowed.schedule = patch.schedule;
+  allowed.updatedAt = serverTimestamp();
+  await updateDoc(doc(db, 'classes', classId), allowed);
+}
+
+/** Recompute denormalized studentsCount from enrollments (repair stale/seed fields). */
+export async function syncClassStudentsCount(classId) {
+  const snap = await getDocs(collection(db, 'classes', classId, 'enrollments'));
+  const n = snap.size;
+  await updateDoc(doc(db, 'classes', classId), {
+    studentsCount: n,
+    students: n, // keep legacy field in sync if present in UI fallbacks
+  });
+  return n;
 }
 
 // ---- Enrollment (students ↔ classes, kept in sync both directions) ----
