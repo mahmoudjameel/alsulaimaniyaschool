@@ -60,21 +60,29 @@ export default function ParentNotes() {
         </div>
       )}
 
-      {visible.map((n) => (
-        <article key={n.id} className="card stu-note">
-          <div className="stu-note-meta">
-            <span className="tag tag-outline">{n.kind || 'ملاحظة'}</span>
-            {n.sentiment && <span className="tag tag-neutral">{n.sentiment}</span>}
-            <span className="stu-feed-time" style={{ marginInlineStart: 'auto' }}>
-              {n.daysAgo != null ? `قبل ${n.daysAgo} يوم` : relativeFromTimestamp(n.createdAt)}
-            </span>
-          </div>
-          <p className="stu-note-text">{n.note || n.text}</p>
-          <div className="stu-class-meta">
-            {[n.by || n.authorName, n.className, active?.name].filter(Boolean).join(' · ')}
-          </div>
-        </article>
-      ))}
+      {visible.map((n) => {
+        const toneLabel = n.sentiment === 'إيجابي' ? 'تشجيع' : n.sentiment === 'محايد' ? 'محايد' : 'متابعة';
+        const kindLabel = n.kind === 'سلوكي' ? 'سلوك'
+          : n.kind === 'صحّي' ? 'صحّة'
+            : n.kind === 'اجتماعي' ? 'اجتماعي'
+              : n.kind === 'أكاديمي' ? 'دراسي'
+                : (n.kind || 'ملاحظة');
+        return (
+          <article key={n.id} className="card stu-note">
+            <div className="stu-note-meta">
+              <span className="tag tag-outline">{kindLabel}</span>
+              <span className={`tag ${n.sentiment === 'إيجابي' ? 'tag-accent' : 'tag-neutral'}`}>{toneLabel}</span>
+              <span className="stu-feed-time" style={{ marginInlineStart: 'auto' }}>
+                {n.daysAgo != null ? `قبل ${n.daysAgo} يوم` : relativeFromTimestamp(n.createdAt)}
+              </span>
+            </div>
+            <p className="stu-note-text">{n.note || n.text}</p>
+            <div className="stu-class-meta">
+              {[n.by || n.authorName, n.className, active?.name].filter(Boolean).join(' · ')}
+            </div>
+          </article>
+        );
+      })}
       {demo && <p className="stu-class-meta">وضع العرض التوضيحي.</p>}
     </div>
   );
