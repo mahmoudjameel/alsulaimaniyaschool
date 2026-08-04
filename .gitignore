@@ -34,3 +34,5 @@ functions/lib
 *.sln
 *.sw?
 deploy-out.txt
+.vercel
+.env*

@@ -27,6 +27,7 @@ import Teachers from './pages/admin/Teachers';
 import TeacherDetail from './pages/admin/TeacherDetail';
 import Cms from './pages/admin/Cms';
 import Users from './pages/admin/Users';
+import SystemBackup from './pages/admin/SystemBackup';
 import AdminGrades from './pages/admin/Grades';
 import ActivityLog from './pages/admin/ActivityLog';
 
@@ -112,6 +113,7 @@ export default function App() {
             <Route path="enrollment" element={<Enrollment />} />
             <Route path="cms" element={<Cms />} />
             <Route path="users" element={<Users />} />
+            <Route path="backup" element={<SystemBackup />} />
             <Route path="activity" element={<ActivityLog />} />
           </Route>
           <Route path="/admin/students/:id/report-card" element={<RequireRole role="admin"><ReportCard /></RequireRole>} />

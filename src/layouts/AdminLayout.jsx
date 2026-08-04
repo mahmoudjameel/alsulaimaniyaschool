@@ -49,6 +49,7 @@ const NAV_GROUPS = [
     label: 'النظام',
     items: [
       { to: '/admin/users', label: 'المستخدمون والصلاحيات', icon: 'admin_panel_settings', permission: 'users.manage' },
+      { to: '/admin/backup', label: 'نسخ احتياطي ومسح', icon: 'settings_backup_restore', permission: null },
       { to: '/admin/activity', label: 'سجلّ الحركات', icon: 'history', permission: 'activity.view' },
     ],
   },
@@ -75,6 +76,7 @@ const TITLES = {
   '/admin/grades': 'الدرجات',
   '/admin/cms': 'الموقع والمحتوى',
   '/admin/users': 'المستخدمون والصلاحيات',
+  '/admin/backup': 'نسخ احتياطي ومسح',
   '/admin/activity': 'سجلّ الحركات',
 };
 

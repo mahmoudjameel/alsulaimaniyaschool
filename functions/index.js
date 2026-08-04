@@ -683,3 +683,10 @@ export const payrollExport = onCall(async (request) => {
   });
   return { csv: rows.join('\n'), filename: `payroll-${period}.csv` };
 });
+
+// System backup / wipe (admin only)
+export {
+  exportSystemBackup,
+  importSystemBackup,
+  wipeSystemData,
+} from './backup.js';

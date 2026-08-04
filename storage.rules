@@ -53,5 +53,15 @@ service firebase.storage {
       allow read: if true;
       allow write: if isStaff() && request.resource.size < 15 * 1024 * 1024;
     }
+
+    // Admin system backups (JSON). Signed URLs from Cloud Functions also work.
+    match /system-backups/{userId}/{fileName} {
+      allow read: if isSignedIn() && myRole() == 'admin' && request.auth.uid == userId;
+      allow write: if isSignedIn()
+        && myRole() == 'admin'
+        && request.auth.uid == userId
+        && request.resource.size < 50 * 1024 * 1024
+        && request.resource.contentType == 'application/json';
+    }
   }
 }
