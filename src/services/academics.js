@@ -2,6 +2,7 @@ import {
   addDoc, collection, deleteDoc, doc, getDoc, getDocs, increment, orderBy, query, serverTimestamp, setDoc, updateDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { logActivity } from './activity';
 
 // ---- Classes ----
 export const classesCol = collection(db, 'classes');
@@ -88,20 +89,41 @@ export async function saveLesson(classId, lessonId, patch) {
       ...patch,
       updatedAt: serverTimestamp(),
     });
-    return lessonId;
+  } else {
+    const ref = await addDoc(collection(db, 'classes', classId, 'lessons'), {
+      ...patch,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    await updateDoc(doc(db, 'classes', classId), { lessonsCount: increment(1) });
+    lessonId = ref.id;
   }
-  const ref = await addDoc(collection(db, 'classes', classId, 'lessons'), {
-    ...patch,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+  await logActivity({
+    type: patch.status === 'منشور' ? 'lesson_published' : 'lesson_saved',
+    actorUid: patch.authorId,
+    actorName: patch.authorName,
+    actorRole: 'teacher',
+    summary: `${patch.status === 'منشور' ? 'نشر' : 'حفظ'} درس «${patch.title || 'بدون عنوان'}»`,
+    targetType: 'class',
+    targetId: classId,
   });
-  await updateDoc(doc(db, 'classes', classId), { lessonsCount: increment(1) });
-  return ref.id;
+  return lessonId;
 }
 
-export async function deleteLesson(classId, lessonId) {
+export async function deleteLesson(classId, lessonId, meta = {}) {
   await deleteDoc(doc(db, 'classes', classId, 'lessons', lessonId));
   await updateDoc(doc(db, 'classes', classId), { lessonsCount: increment(-1) });
+  if (meta.actorUid) {
+    await logActivity({
+      type: 'lesson_deleted',
+      actorUid: meta.actorUid,
+      actorName: meta.actorName,
+      actorRole: 'teacher',
+      summary: 'حذف درس من الصف',
+      targetType: 'class',
+      targetId: classId,
+    });
+  }
 }
 
 // ---- Quizzes (per class) ----

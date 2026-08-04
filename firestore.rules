@@ -179,8 +179,19 @@ service cloud.firestore {
     match /classes/{classId} {
       allow read: if resource.data.visibility == 'عام' || isSignedIn();
       allow create, update: if hasPerm('classes.manage');
-      match /lessons/{lessonId} { allow read: if isSignedIn(); allow write: if hasPerm('classes.manage'); }
-      match /quizzes/{quizId} { allow read: if isSignedIn(); allow write: if hasPerm('classes.manage'); }
+      match /lessons/{lessonId} {
+        allow read: if isSignedIn();
+        // Admin OR the class's assigned teacher can create/edit lessons.
+        allow create, update, delete: if hasPerm('classes.manage')
+          || (isTeacher()
+            && get(/databases/$(database)/documents/classes/$(classId)).data.teacherId == request.auth.uid);
+      }
+      match /quizzes/{quizId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if hasPerm('classes.manage')
+          || (isTeacher()
+            && get(/databases/$(database)/documents/classes/$(classId)).data.teacherId == request.auth.uid);
+      }
       match /enrollments/{studentId} { allow read: if isStaff(); allow write: if hasPerm('enrollment.manage'); }
       // One doc per calendar date (id = 'YYYY-MM-DD') holding every
       // enrolled student's status for that session. The teacher who owns

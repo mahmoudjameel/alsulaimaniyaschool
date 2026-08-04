@@ -1,42 +1,72 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { orderBy } from 'firebase/firestore';
 import Icon from '../../components/Icon';
-import { ErrorBanner, Field } from '../../components/ui';
+import { ErrorBanner, SegmentedTabs } from '../../components/ui';
 import { useMyClasses } from '../../hooks/useMyClasses';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
-import { blockPalette, demoBuilderChapters, demoEnrollments } from '../../data/demo';
+import { demoBuilderChapters, demoEnrollments } from '../../data/demo';
 import { deleteLesson, saveLesson } from '../../services/academics';
+import { saveDayLog } from '../../services/dayLog';
 
-let uid = 0;
-const nextId = () => `blk-${Date.now()}-${++uid}`;
+const STATUS_TONE = { 'قيد التحرير': 'outline', منشور: 'accent', مجدول: 'neutral' };
 
-const BLOCK_DEFAULTS = {
-  title: { kind: 'title', text: 'عنوان جديد' },
-  'نص منسّق': { kind: 'text', text: 'اكتب نصّ الدرس هنا…' },
-  صورة: { kind: 'image', text: '' },
-  قائمة: { kind: 'list', items: ['بند أول', 'بند ثانٍ'] },
-  جدول: { kind: 'table', text: '' },
-  مرفق: { kind: 'file', text: '' },
-  تضمين: { kind: 'embed', text: '' },
-  شريحة: { kind: 'slide', text: '' },
-};
+const LIST_FILTERS = [
+  { id: 'all', label: 'الكل' },
+  { id: 'منشور', label: 'منشور' },
+  { id: 'قيد التحرير', label: 'مسودة' },
+];
 
-const STATUS_TONE = { 'قيد التحرير': 'outline', 'منشور': 'accent', 'مجدول': 'neutral' };
+function emptyLesson(order = 0) {
+  return {
+    id: null,
+    title: '',
+    chapterTitle: '',
+    order,
+    status: 'قيد التحرير',
+    scheduledFor: new Date().toISOString().slice(0, 10),
+    body: '',
+    pointsText: '',
+    whatTaught: '',
+    notes: '',
+    isHomework: false,
+    dueDate: '',
+    syncDiary: true,
+  };
+}
 
-const emptyLesson = (order = 0) => ({
-  id: null,
-  title: 'درس جديد',
-  chapterTitle: 'وحدة عامة',
-  order,
-  status: 'قيد التحرير',
-  scheduledFor: new Date().toISOString().slice(0, 10),
-  blocks: [{ id: nextId(), kind: 'title', text: 'عنوان الدرس' }],
-  whatTaught: '',
-  notes: '',
-  isHomework: false,
-  dueDate: '',
-});
+/** Flatten stored blocks into simple editor fields. */
+function draftFromLesson(lesson) {
+  const blocks = Array.isArray(lesson.blocks) ? lesson.blocks : [];
+  const titleBlock = blocks.find((b) => b.kind === 'title');
+  const textParts = blocks.filter((b) => b.kind === 'text' || b.kind === 'paragraph').map((b) => b.text || b.content || '');
+  const listBlock = blocks.find((b) => b.kind === 'list');
+  const points = listBlock?.items || (listBlock?.text ? String(listBlock.text).split('\n') : []);
+  return {
+    id: lesson.id || null,
+    title: lesson.title || titleBlock?.text || '',
+    chapterTitle: lesson.chapterTitle || '',
+    order: lesson.order ?? 0,
+    status: lesson.status || 'قيد التحرير',
+    scheduledFor: lesson.scheduledFor || '',
+    body: lesson.body || textParts.join('\n\n') || '',
+    pointsText: (points || []).join('\n'),
+    whatTaught: lesson.whatTaught || '',
+    notes: lesson.notes || '',
+    isHomework: !!lesson.isHomework,
+    dueDate: lesson.dueDate || '',
+    syncDiary: true,
+  };
+}
+
+function blocksFromDraft(draft) {
+  const blocks = [];
+  if ((draft.title || '').trim()) blocks.push({ kind: 'title', text: draft.title.trim() });
+  if ((draft.body || '').trim()) blocks.push({ kind: 'text', text: draft.body.trim() });
+  const points = String(draft.pointsText || '').split('\n').map((s) => s.trim()).filter(Boolean);
+  if (points.length) blocks.push({ kind: 'list', items: points });
+  return blocks;
+}
 
 export default function Builder() {
   const [params] = useSearchParams();
@@ -44,6 +74,7 @@ export default function Builder() {
   const [classId, setClassId] = useState(params.get('class') || '');
   const activeClassId = classId || myClasses[0]?.id || '';
   const activeClass = myClasses.find((c) => c.id === activeClassId);
+  const [listFilter, setListFilter] = useState('all');
 
   const demoLessons = useMemo(() => {
     const list = [];
@@ -58,11 +89,12 @@ export default function Builder() {
           status: l.state,
           scheduledFor: null,
           blocks: [
-            { id: nextId(), kind: 'title', text: l.t },
-            { id: nextId(), kind: 'text', text: 'محتوى الدرس التوضيحي…' },
+            { kind: 'title', text: l.t },
+            { kind: 'text', text: 'محتوى الدرس التوضيحي للطالب…' },
           ],
-          whatTaught: '',
+          whatTaught: 'شرح الدرس مع أمثلة صفّية',
           notes: '',
+          isHomework: l.state === 'منشور',
         });
       });
     });
@@ -89,6 +121,10 @@ export default function Builder() {
   const [localLessons, setLocalLessons] = useState([]);
 
   const lessons = demo ? (localLessons.length ? localLessons : liveLessons) : liveLessons;
+  const filteredLessons = useMemo(() => {
+    if (listFilter === 'all') return lessons;
+    return lessons.filter((l) => l.status === listFilter);
+  }, [lessons, listFilter]);
 
   useEffect(() => {
     if (params.get('class')) setClassId(params.get('class'));
@@ -101,62 +137,41 @@ export default function Builder() {
     setMessage('');
   }, [activeClassId]);
 
-  useEffect(() => {
-    if (!draft && lessons.length) {
-      const first = lessons[0];
-      setSelectedId(first.id);
-      setDraft({ ...first, blocks: first.blocks || [] });
-    }
-  }, [lessons, draft]);
-
   const selectLesson = (lesson) => {
     setSelectedId(lesson.id);
-    setDraft({
-      ...lesson,
-      blocks: Array.isArray(lesson.blocks) ? lesson.blocks.map((b) => ({ ...b, id: b.id || nextId() })) : [],
-      whatTaught: lesson.whatTaught || '',
-      notes: lesson.notes || '',
-      scheduledFor: lesson.scheduledFor || '',
-      isHomework: !!lesson.isHomework,
-      dueDate: lesson.dueDate || '',
-    });
+    setDraft(draftFromLesson(lesson));
     setMessage('');
   };
 
   const startNew = () => {
-    const lesson = emptyLesson(lessons.length);
     setSelectedId(null);
-    setDraft(lesson);
+    setDraft(emptyLesson(lessons.length));
     setMessage('');
   };
 
-  const updateBlock = (id, patch) => {
-    setDraft((d) => ({ ...d, blocks: d.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)) }));
-  };
-
-  const addBlock = (paletteLabel) => {
-    const def = BLOCK_DEFAULTS[paletteLabel] || { kind: 'text', text: '' };
-    setDraft((d) => ({ ...d, blocks: [...(d?.blocks || []), { id: nextId(), ...def }] }));
-  };
-
-  const removeBlock = (id) => setDraft((d) => ({ ...d, blocks: d.blocks.filter((b) => b.id !== id) }));
-
   const persist = async (statusOverride) => {
     if (!draft || !activeClass) return;
+    if (!(draft.title || '').trim()) {
+      setMessage('أدخل عنوان الدرس أولاً.');
+      return;
+    }
     const status = statusOverride || draft.status || 'قيد التحرير';
+    const blocks = blocksFromDraft(draft);
     const patch = {
-      title: draft.title || 'درس بدون عنوان',
-      chapterTitle: draft.chapterTitle || 'وحدة عامة',
+      title: draft.title.trim(),
+      chapterTitle: (draft.chapterTitle || '').trim() || 'وحدة عامة',
       order: typeof draft.order === 'number' ? draft.order : lessons.length,
       status,
       scheduledFor: draft.scheduledFor || null,
-      blocks: draft.blocks || [],
-      whatTaught: draft.whatTaught || '',
-      notes: draft.notes || '',
+      blocks,
+      body: (draft.body || '').trim(),
+      whatTaught: (draft.whatTaught || '').trim(),
+      notes: (draft.notes || '').trim(),
       isHomework: !!draft.isHomework,
       dueDate: draft.isHomework ? (draft.dueDate || null) : null,
       authorId: profile?.id || null,
       authorName: profile?.name || '',
+      published: status === 'منشور',
     };
     setSaving(true);
     setMessage('');
@@ -170,16 +185,39 @@ export default function Builder() {
           return exists ? base.map((l) => (l.id === id ? saved : l)) : [...base, saved];
         });
         setSelectedId(id);
-        setDraft(saved);
-        setMessage(status === 'منشور' ? 'نُشر الدرس (عرض توضيحي).' : 'حُفظ الدرس (عرض توضيحي).');
+        setDraft(draftFromLesson(saved));
+        setMessage(status === 'منشور' ? 'نُشر الدرس للطلاب (عرض).' : 'حُفظت المسودة (عرض).');
       } else {
         const id = await saveLesson(activeClassId, draft.id || null, patch);
+        if (status === 'منشور' && draft.syncDiary && draft.scheduledFor) {
+          try {
+            await saveDayLog({
+              classId: activeClassId,
+              className: activeClass.title,
+              subject: activeClass.subject,
+              teacherId: profile.id,
+              teacherName: profile.name,
+              date: draft.scheduledFor,
+              topic: draft.whatTaught || draft.title,
+              homework: draft.isHomework
+                ? [(draft.dueDate ? `التسليم ${draft.dueDate}: ` : '') + (draft.notes || draft.title)].join('')
+                : '',
+              notice: '',
+            });
+          } catch {
+            // Day log is best-effort; lesson already saved.
+          }
+        }
         setSelectedId(id);
-        setDraft((d) => ({ ...d, ...patch, id }));
-        setMessage(status === 'منشور' ? 'نُشر الدرس وحُفظ في المساق.' : 'حُفظ الدرس.');
+        setDraft((d) => ({ ...d, ...draftFromLesson({ ...patch, id }), id }));
+        setMessage(
+          status === 'منشور'
+            ? 'نُشر الدرس — يظهر للطالب والإدارة الآن.'
+            : 'حُفظت المسودة (لا يراها الطالب حتى تنشرها).',
+        );
       }
     } catch {
-      setMessage('تعذّر حفظ الدرس.');
+      setMessage('تعذّر حفظ الدرس. تأكد أن الصف مسند إليك.');
     } finally {
       setSaving(false);
     }
@@ -187,17 +225,15 @@ export default function Builder() {
 
   const onDelete = async () => {
     if (!draft?.id || !activeClassId) return;
-    if (!window.confirm('حذف هذا الدرس؟')) return;
+    if (!window.confirm('حذف هذا الدرس؟ لن يظهر للطالب بعد الحذف.')) return;
     try {
       if (demo) {
         setLocalLessons((list) => (list.length ? list : liveLessons).filter((l) => l.id !== draft.id));
-        setDraft(null);
-        setSelectedId(null);
       } else {
-        await deleteLesson(activeClassId, draft.id);
-        setDraft(null);
-        setSelectedId(null);
+        await deleteLesson(activeClassId, draft.id, { actorUid: profile?.id, actorName: profile?.name });
       }
+      setDraft(null);
+      setSelectedId(null);
       setMessage('حُذف الدرس.');
     } catch {
       setMessage('تعذّر الحذف.');
@@ -207,156 +243,232 @@ export default function Builder() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <ErrorBanner>{error && 'تعذّر تحميل صفوفك.'}</ErrorBanner>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <Field label="المساق / الصف">
-          <select className="input" style={{ minWidth: 260 }} value={activeClassId} onChange={(e) => setClassId(e.target.value)}>
-            {myClasses.map((c) => <option key={c.id} value={c.id}>{c.title} — {c.subject} ({c.grade})</option>)}
+      <p style={{ margin: 0, fontSize: 14, color: 'var(--color-neutral-700)', lineHeight: 1.7 }}>
+        اكتب درس الصف بخطوات بسيطة، ثم انشره ليظهر للطالب المسجّل وفي لوحة الإدارة.
+        المسودة تبقى خاصة بك حتى تضغط «نشر للطلاب».
+      </p>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end' }}>
+        <div className="field" style={{ minWidth: 240, flex: 1 }}>
+          <label>الصف</label>
+          <select className="input" value={activeClassId} onChange={(e) => setClassId(e.target.value)}>
+            {myClasses.length === 0 && <option value="">لا صفوف مسندة</option>}
+            {myClasses.map((c) => (
+              <option key={c.id} value={c.id}>{c.title} — {c.subject}{c.grade ? ` · ${c.grade}` : ''}</option>
+            ))}
           </select>
-        </Field>
-        <span style={{ marginInlineStart: 'auto' }} />
-        <button type="button" className="btn btn-primary" style={{ fontSize: 13 }} onClick={startNew}>
-          <Icon name="add" size={14} /> درس يومي جديد
+        </div>
+        <button type="button" className="btn btn-primary" onClick={startNew} disabled={!activeClass}>
+          <Icon name="add" size={14} /> درس جديد
         </button>
+        <Link to={`/teacher/diary?class=${activeClassId}`} className="btn btn-secondary" style={{ textDecoration: 'none', fontSize: 13 }}>
+          دفتر اليوم
+        </Link>
       </div>
+
       {message && <div style={{ fontSize: 13, color: 'var(--color-accent-700)' }}>{message}</div>}
 
       {!activeClass ? (
-        <div className="card">لا توجد مساقات مسندة إليك.</div>
+        <div className="card">لا صفوف مسندة إليك — اطلب من الإدارة تعيينك معلّماً لصف.</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr 220px', gap: 16, alignItems: 'start' }} className="ah-2col">
-          <div className="card">
-            <div className="card-kicker">دروس المساق</div>
-            <div className="card-title" style={{ fontSize: 15, marginBottom: 8 }}>{activeClass.title}</div>
-            {lessons.length === 0 && <div style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}>لا دروس بعد — أنشئ درساً يومياً.</div>}
-            {lessons.map((l) => (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 280px) 1fr', gap: 16, alignItems: 'start' }} className="ah-2col">
+          <aside className="card" style={{ gap: 10 }}>
+            <div className="card-title" style={{ margin: 0, fontSize: 16 }}>دروس الصف</div>
+            <div style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>
+              {enrolled.length} طالب مسجّل · {lessons.length} درس
+            </div>
+            <SegmentedTabs
+              tabs={LIST_FILTERS.map((f) => ({
+                ...f,
+                active: listFilter === f.id,
+                onClick: () => setListFilter(f.id),
+              }))}
+            />
+            {filteredLessons.length === 0 && (
+              <div style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}>لا دروس في هذه الفئة.</div>
+            )}
+            {filteredLessons.map((l) => (
               <button
                 key={l.id}
                 type="button"
                 onClick={() => selectLesson(l)}
                 style={{
-                  display: 'block', width: '100%', textAlign: 'right', padding: '8px 10px', marginBottom: 6,
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'right',
+                  padding: '10px 12px',
                   border: `1px solid ${selectedId === l.id ? 'var(--gold)' : 'var(--line)'}`,
-                  borderRadius: 'var(--radius-sm)', background: 'transparent', cursor: 'pointer', fontSize: 13,
+                  borderRadius: 10,
+                  background: selectedId === l.id ? 'color-mix(in srgb, var(--color-accent-100) 65%, #fff)' : '#fff',
+                  cursor: 'pointer',
                 }}
               >
-                <div style={{ fontWeight: 600 }}>{l.title}</div>
-                <div style={{ fontSize: 11, color: 'var(--color-neutral-500)', display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                  <span>{l.chapterTitle}</span>
-                  <span className={`tag tag-${STATUS_TONE[l.status] || 'neutral'}`} style={{ fontSize: 9 }}>{l.status}</span>
+                <div style={{ fontWeight: 700, fontSize: 13 }}>{l.title || 'بدون عنوان'}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-neutral-500)', marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <span className={`tag tag-${STATUS_TONE[l.status] || 'neutral'}`} style={{ fontSize: 9 }}>
+                    {l.status === 'قيد التحرير' ? 'مسودة' : l.status}
+                  </span>
                   {l.isHomework && <span className="tag tag-accent" style={{ fontSize: 9 }}>واجب</span>}
+                  {l.scheduledFor && <span>{l.scheduledFor}</span>}
                 </div>
               </button>
             ))}
-          </div>
+          </aside>
 
-          <div className="card">
+          <section className="card" style={{ gap: 14 }}>
             {!draft ? (
-              <div style={{ color: 'var(--color-neutral-500)', fontSize: 13 }}>اختر درساً أو أنشئ درساً جديداً.</div>
+              <div style={{ color: 'var(--color-neutral-500)', fontSize: 14, lineHeight: 1.7 }}>
+                اختر درساً من القائمة أو اضغط «درس جديد».
+                <div style={{ marginTop: 10 }}>
+                  <button type="button" className="btn btn-primary" onClick={startNew}>بدء درس جديد</button>
+                </div>
+              </div>
             ) : (
               <>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                  <input className="input" value={draft.title} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} style={{ flex: 1, minWidth: 180, fontFamily: 'var(--font-heading)', fontSize: 18 }} />
-                  <span className={`tag tag-${STATUS_TONE[draft.status] || 'outline'}`}>{draft.status}</span>
-                  <button type="button" className="btn btn-secondary" style={{ fontSize: 12 }} disabled={saving} onClick={() => persist()}>حفظ</button>
-                  <button type="button" className="btn btn-primary" style={{ fontSize: 12 }} disabled={saving} onClick={() => persist('منشور')}>نشر</button>
-                  {draft.id && <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={onDelete}>حذف</button>}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div className="card-title" style={{ margin: 0 }}>{draft.id ? 'تعديل الدرس' : 'درس جديد'}</div>
+                  <span className={`tag tag-${STATUS_TONE[draft.status] || 'outline'}`}>
+                    {draft.status === 'قيد التحرير' ? 'مسودة' : draft.status}
+                  </span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
-                  <Field label="الوحدة / الفصل">
-                    <input className="input" value={draft.chapterTitle || ''} onChange={(e) => setDraft((d) => ({ ...d, chapterTitle: e.target.value }))} />
-                  </Field>
-                  <Field label="تاريخ الدرس">
-                    <input className="input" type="date" value={draft.scheduledFor || ''} onChange={(e) => setDraft((d) => ({ ...d, scheduledFor: e.target.value }))} dir="ltr" style={{ textAlign: 'right' }} />
-                  </Field>
-                  <Field label="الترتيب">
-                    <input className="input" type="number" value={draft.order ?? 0} onChange={(e) => setDraft((d) => ({ ...d, order: Number(e.target.value) }))} dir="ltr" style={{ textAlign: 'right' }} />
-                  </Field>
+
+                <div className="field">
+                  <label>1) عنوان الدرس</label>
+                  <input
+                    className="input"
+                    value={draft.title}
+                    onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+                    placeholder="مثال: المدّ بالألف — قراءة وتدريب"
+                    required
+                  />
                 </div>
-                <Field label="ماذا أُعطي اليوم؟ (ملخّص للمعلّم)">
-                  <textarea className="input" rows={2} value={draft.whatTaught || ''} onChange={(e) => setDraft((d) => ({ ...d, whatTaught: e.target.value }))} placeholder="مثال: شرح مدّ الواو + تمارين قراءة جهرية" />
-                </Field>
-                <Field label="ملاحظات الدرس">
-                  <textarea className="input" rows={2} value={draft.notes || ''} onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))} placeholder="ملاحظات خاصة بالصف أو الواجب…" />
-                </Field>
-                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', margin: '10px 0 4px' }}>
-                  <label className="radio">
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="field">
+                    <label>الوحدة / الفصل</label>
+                    <input
+                      className="input"
+                      value={draft.chapterTitle}
+                      onChange={(e) => setDraft((d) => ({ ...d, chapterTitle: e.target.value }))}
+                      placeholder="مثال: الوحدة 2"
+                    />
+                  </div>
+                  <div className="field">
+                    <label>تاريخ الحصة</label>
+                    <input
+                      className="input"
+                      type="date"
+                      value={draft.scheduledFor || ''}
+                      onChange={(e) => setDraft((d) => ({ ...d, scheduledFor: e.target.value }))}
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label>2) ماذا أُعطي في الحصة؟ (ملخّص سريع)</label>
+                  <textarea
+                    className="input"
+                    rows={2}
+                    value={draft.whatTaught}
+                    onChange={(e) => setDraft((d) => ({ ...d, whatTaught: e.target.value }))}
+                    placeholder="مثال: شرح المدّ + قراءة جهرية + تمارين السبورة"
+                    style={{ resize: 'vertical' }}
+                  />
+                </div>
+
+                <div className="field">
+                  <label>3) محتوى يظهر للطالب بعد النشر</label>
+                  <textarea
+                    className="input"
+                    rows={5}
+                    value={draft.body}
+                    onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
+                    placeholder="اكتب شرح الدرس أو الملخص الذي سيقرأه الطالب…"
+                    style={{ resize: 'vertical' }}
+                  />
+                </div>
+
+                <div className="field">
+                  <label>نقاط مهمة (اختياري — بند في كل سطر)</label>
+                  <textarea
+                    className="input"
+                    rows={3}
+                    value={draft.pointsText}
+                    onChange={(e) => setDraft((d) => ({ ...d, pointsText: e.target.value }))}
+                    placeholder={'مثال:\nمدّ الألف بعد الفتحة\nأمثلة من الكتاب ص. 24'}
+                    style={{ resize: 'vertical' }}
+                  />
+                </div>
+
+                <div style={{ padding: 12, border: '1px solid var(--line)', borderRadius: 12, display: 'grid', gap: 10 }}>
+                  <label className="radio" style={{ margin: 0 }}>
                     <input
                       type="checkbox"
                       checked={!!draft.isHomework}
                       onChange={(e) => setDraft((d) => ({ ...d, isHomework: e.target.checked }))}
                     />
-                    <span className="dot" /> يظهر كواجب في بوابة الطالب
+                    <span className="dot" /> هذا الدرس فيه واجب بيتي (يظهر في واجبات الطالب)
                   </label>
                   {draft.isHomework && (
-                    <Field label="تاريخ التسليم">
+                    <div className="field" style={{ margin: 0 }}>
+                      <label>آخر موعد للتسليم</label>
                       <input
                         className="input"
                         type="date"
                         value={draft.dueDate || ''}
                         onChange={(e) => setDraft((d) => ({ ...d, dueDate: e.target.value }))}
                         dir="ltr"
-                        style={{ textAlign: 'right', minWidth: 160 }}
+                        style={{ maxWidth: 200 }}
                       />
-                    </Field>
+                    </div>
+                  )}
+                  <div className="field" style={{ margin: 0 }}>
+                    <label>تفاصيل الواجب / ملاحظة للطالب (اختياري)</label>
+                    <textarea
+                      className="input"
+                      rows={2}
+                      value={draft.notes}
+                      onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
+                      placeholder="مثال: حل تمارين الصفحة 12 في الدفتر"
+                      style={{ resize: 'vertical' }}
+                    />
+                  </div>
+                  <label className="radio" style={{ margin: 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={!!draft.syncDiary}
+                      onChange={(e) => setDraft((d) => ({ ...d, syncDiary: e.target.checked }))}
+                    />
+                    <span className="dot" /> عند النشر: انسخ الملخص لدفتر اليوم بنفس التاريخ
+                  </label>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => persist('قيد التحرير')}>
+                    <Icon name="save" size={14} /> حفظ مسودة
+                  </button>
+                  <button type="button" className="btn btn-primary" disabled={saving} onClick={() => persist('منشور')}>
+                    <Icon name="publish" size={14} /> نشر للطلاب
+                  </button>
+                  {draft.status === 'منشور' && (
+                    <button type="button" className="btn btn-ghost" disabled={saving} onClick={() => persist('قيد التحرير')}>
+                      إلغاء النشر
+                    </button>
+                  )}
+                  {draft.id && (
+                    <button type="button" className="btn btn-ghost" style={{ marginInlineStart: 'auto' }} onClick={onDelete}>
+                      حذف
+                    </button>
                   )}
                 </div>
 
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: 10, border: '1px solid var(--line)', borderRadius: 'var(--radius-md)', margin: '12px 0' }}>
-                  <span style={{ fontSize: 11, color: 'var(--color-neutral-500)', alignSelf: 'center' }}>إضافة كتلة:</span>
-                  {blockPalette.map((b) => (
-                    <button key={b.label} type="button" className="btn btn-secondary" style={{ fontSize: 12, padding: '6px 10px' }} onClick={() => addBlock(b.label)}>
-                      <Icon name={b.icon} size={13} /> {b.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-md)', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {(draft.blocks || []).map((blk) => (
-                    <div key={blk.id} style={{ position: 'relative', paddingInlineEnd: 28 }}>
-                      <button type="button" onClick={() => removeBlock(blk.id)} style={{ position: 'absolute', top: 0, insetInlineStart: 0, background: 'none', border: 0, cursor: 'pointer', color: 'var(--color-neutral-400)' }}>
-                        <Icon name="close" size={14} />
-                      </button>
-                      {blk.kind === 'title' && (
-                        <input className="input" value={blk.text || ''} onChange={(e) => updateBlock(blk.id, { text: e.target.value })} style={{ fontFamily: 'var(--font-heading)', fontSize: 18 }} />
-                      )}
-                      {blk.kind === 'text' && (
-                        <textarea className="input" rows={3} value={blk.text || ''} onChange={(e) => updateBlock(blk.id, { text: e.target.value })} />
-                      )}
-                      {blk.kind === 'list' && (
-                        <textarea
-                          className="input"
-                          rows={3}
-                          value={(blk.items || []).join('\n')}
-                          onChange={(e) => updateBlock(blk.id, { items: e.target.value.split('\n') })}
-                          placeholder="بند في كل سطر"
-                        />
-                      )}
-                      {['image', 'table', 'file', 'embed', 'slide'].includes(blk.kind) && (
-                        <div className="ah-cover" style={{ height: 70 }}>
-                          {{ image: 'صورة', table: 'جدول', file: 'مرفق', embed: 'تضمين', slide: 'شريحة' }[blk.kind]}
-                          <input className="input" style={{ marginTop: 6, fontSize: 12 }} placeholder="رابط أو وصف (اختياري)" value={blk.text || ''} onChange={(e) => updateBlock(blk.id, { text: e.target.value })} />
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div style={{ fontSize: 12, color: 'var(--color-neutral-600)', lineHeight: 1.6, paddingTop: 4 }}>
+                  بعد النشر: يظهر في بوابة الطالب (صفوفي){draft.isHomework ? ' وفي الواجبات' : ''}، وتراه الإدارة من تفاصيل الصف.
                 </div>
               </>
             )}
-          </div>
-
-          <div className="card">
-            <div className="card-kicker">طلاب المساق</div>
-            <div className="card-title" style={{ fontSize: 14, marginBottom: 8 }}>{enrolled.length} طالباً</div>
-            {enrolled.length === 0 && <div style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}>لا طلاب مسجّلين</div>}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 420, overflow: 'auto' }}>
-              {enrolled.map((s) => (
-                <div key={s.studentId || s.id} style={{ fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--line)' }}>
-                  <div style={{ fontWeight: 600 }}>{s.studentName || s.name}</div>
-                  <div className="ah-tabnum" style={{ fontSize: 11, color: 'var(--color-neutral-500)' }}>{s.displayId}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+          </section>
         </div>
       )}
     </div>

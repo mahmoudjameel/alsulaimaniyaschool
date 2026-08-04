@@ -18,6 +18,7 @@ export default function ClassDetail() {
   const { data: teachers } = useLiveOrDemo('teacherProfiles', [], demoTeacherProfiles);
   const { data: sessions } = useLiveOrDemo(`classes/${id}/attendanceSessions`, [orderBy('date', 'desc')], demoAttendanceSessions[id] || []);
   const { data: dayLogs } = useLiveOrDemo(`classes/${id}/dayLogs`, [orderBy('date', 'desc')], []);
+  const { data: lessons } = useLiveOrDemo(`classes/${id}/lessons`, [orderBy('order', 'asc')], []);
   const [openDate, setOpenDate] = useState(null);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState(false);
@@ -120,6 +121,46 @@ export default function ClassDetail() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="card" style={{ padding: 0 }}>
+        <div className="card-title" style={{ padding: '14px 14px 0' }}>
+          دروس المعلّم ({lessons.length})
+        </div>
+        <table className="table" style={{ marginTop: 8 }}>
+          <thead>
+            <tr>
+              <th>العنوان</th>
+              <th>الوحدة</th>
+              <th>التاريخ</th>
+              <th>الحالة</th>
+              <th>واجب</th>
+              <th>المعلّم</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lessons.length === 0 && <EmptyRow colSpan={6}>لا دروس بعد لهذا الصف.</EmptyRow>}
+            {lessons.map((l) => (
+              <tr key={l.id}>
+                <td>
+                  <div style={{ fontWeight: 600 }}>{l.title || '—'}</div>
+                  {l.whatTaught && (
+                    <div style={{ fontSize: 12, color: 'var(--color-neutral-600)', marginTop: 2 }}>{l.whatTaught}</div>
+                  )}
+                </td>
+                <td>{l.chapterTitle || '—'}</td>
+                <td className="ah-tabnum">{l.scheduledFor || '—'}</td>
+                <td>
+                  <span className={`tag tag-${l.status === 'منشور' ? 'accent' : 'outline'}`}>
+                    {l.status === 'قيد التحرير' ? 'مسودة' : (l.status || '—')}
+                  </span>
+                </td>
+                <td>{l.isHomework ? 'نعم' : '—'}</td>
+                <td>{l.authorName || cls.teacher || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <div className="card" style={{ padding: 0 }}>

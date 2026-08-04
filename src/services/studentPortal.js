@@ -112,15 +112,21 @@ export function isHomeworkLesson(lesson) {
 /** Render lesson blocks for the student view (matches Builder kinds). */
 export function formatLessonBody(lesson) {
   if (!lesson) return '';
+  if (lesson.body && String(lesson.body).trim()) return String(lesson.body).trim();
   const parts = [];
   for (const b of lesson.blocks || []) {
     const kind = b.kind || b.type;
-    if (kind === 'title' && (b.text || b.content)) parts.push(b.text || b.content);
-    else if ((kind === 'text' || kind === 'paragraph') && (b.text || b.content)) parts.push(b.text || b.content);
-    else if (kind === 'list') {
+    if (kind === 'title' && (b.text || b.content)) {
+      // title already shown as lesson.title — skip duplicate unless different
+      if ((b.text || b.content) !== lesson.title) parts.push(b.text || b.content);
+    } else if ((kind === 'text' || kind === 'paragraph') && (b.text || b.content)) {
+      parts.push(b.text || b.content);
+    } else if (kind === 'list') {
       const items = b.items || String(b.text || '').split('\n').filter(Boolean);
       if (items.length) parts.push(items.map((it) => `• ${it}`).join('\n'));
-    } else if (b.text || b.content) parts.push(b.text || b.content);
+    } else if (b.text || b.content) {
+      parts.push(b.text || b.content);
+    }
   }
   return parts.filter(Boolean).join('\n\n') || lesson.summary || lesson.whatTaught || '';
 }

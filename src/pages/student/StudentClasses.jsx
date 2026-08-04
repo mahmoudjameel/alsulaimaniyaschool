@@ -50,7 +50,7 @@ export default function StudentClasses() {
 
   const lessonPath = activeId ? `classes/${activeId}/lessons` : 'classes/__none__/lessons';
   const quizPath = activeId ? `classes/${activeId}/quizzes` : 'classes/__none__/quizzes';
-  const { data: lessons } = useLiveOrDemo(lessonPath, [orderBy('createdAt', 'desc')], demo && active ? [
+  const { data: lessons } = useLiveOrDemo(lessonPath, [orderBy('order', 'asc')], demo && active ? [
     { id: 'l1', title: active.nextLesson || 'الدرس التالي', status: 'منشور', summary: 'اقرأ الملخص ثم راجع الأمثلة مع معلّمك.', blocks: [{ type: 'text', content: 'مرحباً بك في الدرس.' }] },
   ] : [], activeId || '__none__');
   const { data: quizzes } = useLiveOrDemo(quizPath, [orderBy('createdAt', 'desc')], demo && active ? [
@@ -100,16 +100,29 @@ export default function StudentClasses() {
         </header>
 
         <section className="card">
-          <h2 className="card-title" style={{ marginBottom: 10 }}>الدروس</h2>
-          {publishedLessons.length === 0 && <p className="stu-empty">لا دروس منشورة بعد.</p>}
+          <h2 className="card-title" style={{ marginBottom: 10 }}>الدروس المنشورة</h2>
+          {publishedLessons.length === 0 && <p className="stu-empty">لا دروس منشورة بعد. ستظهر هنا عندما ينشر معلّمك درساً.</p>}
           {publishedLessons.map((l) => (
             <article key={l.id} className="stu-lesson">
-              <h3 className="stu-lesson-title">{l.title || 'درس'}</h3>
-              <div className="stu-lesson-body">
-                {formatLessonBody(l) || '—'}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
+                {l.chapterTitle && <span className="tag tag-neutral">{l.chapterTitle}</span>}
+                {l.scheduledFor && <span className="stu-class-meta">{l.scheduledFor}</span>}
+                {l.isHomework && <span className="tag tag-accent">واجب</span>}
               </div>
-              {l.isHomework && <span className="tag tag-accent" style={{ marginTop: 6 }}>واجب</span>}
-              {l.authorName && <div className="stu-class-meta" style={{ marginTop: 4 }}>المعلّم: {l.authorName}</div>}
+              <h3 className="stu-lesson-title">{l.title || 'درس'}</h3>
+              {l.whatTaught && (
+                <div className="stu-class-meta" style={{ marginBottom: 8 }}>ملخّص الحصة: {l.whatTaught}</div>
+              )}
+              <div className="stu-lesson-body" style={{ whiteSpace: 'pre-wrap' }}>
+                {formatLessonBody(l) || l.body || '—'}
+              </div>
+              {l.notes && l.isHomework && (
+                <div style={{ marginTop: 8, fontSize: 13 }}>
+                  <strong>الواجب:</strong> {l.notes}
+                  {l.dueDate ? ` · التسليم: ${l.dueDate}` : ''}
+                </div>
+              )}
+              {l.authorName && <div className="stu-class-meta" style={{ marginTop: 6 }}>المعلّم: {l.authorName}</div>}
             </article>
           ))}
         </section>

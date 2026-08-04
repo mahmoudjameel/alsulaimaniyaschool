@@ -64,6 +64,9 @@ export default function TeacherClassDetail() {
           <Link to={`/teacher/diary?class=${id}`} className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
             <Icon name="edit_note" size={15} /> دفتر اليوم
           </Link>
+          <Link to={`/teacher/builder?class=${id}`} className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
+            <Icon name="menu_book" size={15} /> دروس الصف
+          </Link>
           <Link to={`/teacher/observations?class=${id}`} className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
             <Icon name="chat" size={15} /> ملاحظات
           </Link>

@@ -16,7 +16,7 @@ const NAV_PRIMARY = [
 ];
 
 const NAV_EXTRA = [
-  { to: '/teacher/builder', label: 'محتوى الدروس', icon: 'menu_book' },
+  { to: '/teacher/builder', label: 'دروس الصف', icon: 'menu_book' },
   { to: '/teacher/quiz', label: 'اختبارات', icon: 'checklist' },
 ];
 
@@ -29,7 +29,7 @@ const TITLES = {
   '/teacher/grades': 'الدرجات',
   '/teacher/diary': 'دفتر اليوم',
   '/teacher/observations': 'الملاحظات',
-  '/teacher/builder': 'محتوى الدروس',
+  '/teacher/builder': 'دروس الصف',
   '/teacher/quiz': 'الاختبارات',
 };
 
