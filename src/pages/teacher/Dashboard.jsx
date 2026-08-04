@@ -5,6 +5,7 @@ import Icon from '../../components/Icon';
 import { ErrorBanner } from '../../components/ui';
 import { useMyClasses } from '../../hooks/useMyClasses';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
+import { enrolledDisplayCount, useEnrollmentCounts } from '../../hooks/useEnrollmentCounts';
 
 const QUICK = [
   { to: '/teacher/attendance', icon: 'fact_check', title: 'الحضور والغياب', body: 'تسجيل حضور صفّك لليوم.' },
@@ -15,6 +16,8 @@ const QUICK = [
 
 export default function TeacherDashboard() {
   const { myClasses, profile, error, demo } = useMyClasses();
+  const classIds = useMemo(() => myClasses.map((c) => c.id), [myClasses]);
+  const enrollmentCounts = useEnrollmentCounts(classIds);
   const { data: myGradeEntries } = useLiveOrDemo(
     'gradeEntries',
     [where('teacherId', '==', profile?.id || '__none__'), orderBy('createdAt', 'desc')],
@@ -26,8 +29,11 @@ export default function TeacherDashboard() {
     [myGradeEntries],
   );
   const totalStudents = useMemo(
-    () => myClasses.reduce((n, c) => n + Number(c.studentsCount ?? c.students ?? 0), 0),
-    [myClasses],
+    () => myClasses.reduce((n, c) => {
+      const count = enrolledDisplayCount(c, enrollmentCounts, { demo });
+      return n + (count == null ? 0 : count);
+    }, 0),
+    [myClasses, enrollmentCounts, demo],
   );
 
   return (
@@ -95,7 +101,9 @@ export default function TeacherDashboard() {
         )}
 
         <div style={{ display: 'grid', gap: 10 }}>
-          {myClasses.map((c) => (
+          {myClasses.map((c) => {
+            const n = enrolledDisplayCount(c, enrollmentCounts, { demo });
+            return (
             <div
               key={c.id}
               className="card"
@@ -113,7 +121,7 @@ export default function TeacherDashboard() {
                   </div>
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--color-neutral-600)', textAlign: 'left' }}>
-                  {Number(c.studentsCount ?? c.students ?? 0)} طالب
+                  {n == null ? '…' : `${n} طالب`}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -131,7 +139,8 @@ export default function TeacherDashboard() {
                 </Link>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </section>
     </div>
