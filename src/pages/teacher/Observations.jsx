@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { orderBy, where } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import SearchInput from '../../components/SearchInput';
@@ -14,11 +15,17 @@ const KINDS = ['أكاديمي', 'سلوكي', 'اجتماعي', 'صحّي'];
 const SENTIMENTS = ['إيجابي', 'محايد', 'ملاحظة'];
 
 export default function Observations() {
+  const [params] = useSearchParams();
   const { myClasses, profile, demo, error } = useMyClasses();
-  const [classId, setClassId] = useState('');
+  const [classId, setClassId] = useState(params.get('class') || '');
   const activeClassId = classId || myClasses[0]?.id || '';
   const activeClass = myClasses.find((c) => c.id === activeClassId);
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    const fromUrl = params.get('class');
+    if (fromUrl) setClassId(fromUrl);
+  }, [params]);
 
   const { data: enrolled } = useLiveOrDemo(
     activeClassId ? `classes/${activeClassId}/enrollments` : '__none__',
@@ -102,8 +109,9 @@ export default function Observations() {
     <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 20, alignItems: 'start' }} className="ah-2col">
       <div className="card">
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
-          <div className="card-title" style={{ margin: 0 }}>ملاحظات مساقاتي</div>
+          <div className="card-title" style={{ margin: 0 }}>ملاحظات صفوفي</div>
           <select className="input" style={{ width: 'auto', fontSize: 13, marginInlineStart: 'auto' }} value={activeClassId} onChange={(e) => { setClassId(e.target.value); setStudentId(''); setSearch(''); }}>
+            {myClasses.length === 0 && <option value="">لا صفوف</option>}
             {myClasses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
           </select>
         </div>
@@ -114,7 +122,7 @@ export default function Observations() {
           style={{ marginBottom: 12, maxWidth: '100%' }}
         />
         <ErrorBanner>{error && 'تعذّر تحميل البيانات.'}</ErrorBanner>
-        {list.length === 0 && <div style={{ fontSize: 13, color: 'var(--color-neutral-500)' }}>لا ملاحظات بعد لهذا المساق.</div>}
+        {list.length === 0 && <div style={{ fontSize: 13, color: 'var(--color-neutral-500)' }}>لا ملاحظات بعد لهذا الصف.</div>}
         {list.map((o) => (
           <div key={o.id} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--line)' }}>
             <div style={{ width: 34, height: 34, flex: 'none', borderRadius: '50%', background: 'var(--color-neutral-200)', display: 'grid', placeItems: 'center' }}>
@@ -138,7 +146,7 @@ export default function Observations() {
 
       <form className="card" onSubmit={onSave}>
         <div className="card-title" style={{ marginBottom: 8 }}>ملاحظة جديدة</div>
-        <Field label="الطالب (من طلاب مساقك)">
+        <Field label="الطالب (من طلاب صفّك)">
           <select className="input" value={studentId} onChange={(e) => setStudentId(e.target.value)} required>
             <option value="" disabled>اختر طالباً…</option>
             {enrolledOptions.map((s) => (

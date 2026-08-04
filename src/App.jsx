@@ -33,6 +33,8 @@ import ActivityLog from './pages/admin/ActivityLog';
 
 import TeacherLayout from './layouts/TeacherLayout';
 import TeacherDashboard from './pages/teacher/Dashboard';
+import TeacherClasses from './pages/teacher/TeacherClasses';
+import TeacherClassDetail from './pages/teacher/TeacherClassDetail';
 import Builder from './pages/teacher/Builder';
 import Quiz from './pages/teacher/Quiz';
 import TeacherGrades from './pages/teacher/Grades';
@@ -120,6 +122,8 @@ export default function App() {
 
           <Route path="/teacher" element={<RequireRole role="teacher"><TeacherLayout /></RequireRole>}>
             <Route index element={<TeacherDashboard />} />
+            <Route path="classes" element={<TeacherClasses />} />
+            <Route path="classes/:id" element={<TeacherClassDetail />} />
             <Route path="builder" element={<Builder />} />
             <Route path="quiz" element={<Quiz />} />
             <Route path="grades" element={<TeacherGrades />} />

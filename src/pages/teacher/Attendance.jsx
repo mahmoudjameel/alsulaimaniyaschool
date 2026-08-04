@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { orderBy } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import SearchInput from '../../components/SearchInput';
 import { ErrorBanner } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useDocOrDemo, useLiveOrDemo } from '../../hooks/useFirestore';
-import { demoClasses, demoEnrollments } from '../../data/demo';
+import { useMyClasses } from '../../hooks/useMyClasses';
+import { demoEnrollments } from '../../data/demo';
 import { ATTENDANCE_STATUSES } from '../../lib/attendance';
 import { submitAttendance } from '../../services/attendance';
 import { filterByStudentSearch } from '../../lib/studentSearch';
@@ -14,16 +16,18 @@ const todayStr = () => new Date().toISOString().slice(0, 10);
 
 export default function Attendance() {
   const { profile } = useAuth();
-  const { data: allClasses, error } = useLiveOrDemo('classes', [orderBy('createdAt', 'desc')], demoClasses);
-  const myClasses = useMemo(
-    () => (profile?.id ? allClasses.filter((c) => c.teacherId === profile.id) : allClasses),
-    [allClasses, profile?.id]
-  );
-  const [classId, setClassId] = useState('');
+  const [params] = useSearchParams();
+  const { myClasses, error, demo: classesDemo } = useMyClasses();
+  const [classId, setClassId] = useState(params.get('class') || '');
   const activeClassId = classId || myClasses[0]?.id || '';
   const activeClass = myClasses.find((c) => c.id === activeClassId);
   const [date, setDate] = useState(todayStr());
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    const fromUrl = params.get('class');
+    if (fromUrl) setClassId(fromUrl);
+  }, [params]);
 
   const { data: enrolled } = useLiveOrDemo(
     activeClassId ? `classes/${activeClassId}/enrollments` : '__none__',
@@ -60,7 +64,7 @@ export default function Attendance() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (demo) { setMessage('وضع العرض التوضيحي: صِل مشروع Firebase لحفظ الحضور فعلياً.'); return; }
+    if (demo || classesDemo) { setMessage('وضع العرض التوضيحي: صِل مشروع Firebase لحفظ الحضور فعلياً.'); return; }
     if (!activeClass) return;
     setSubmitting(true);
     setMessage('');
@@ -92,7 +96,7 @@ export default function Attendance() {
             <label>الصف</label>
             <select className="input" value={activeClassId} onChange={(e) => { setClassId(e.target.value); setSearch(''); }}>
               {myClasses.length === 0 && <option value="">لا يوجد صفوف مسندة إليك</option>}
-              {myClasses.map((c) => <option key={c.id} value={c.id}>{c.title} — {c.subject}</option>)}
+              {myClasses.map((c) => <option key={c.id} value={c.id}>{c.title} — {c.subject}{c.grade ? ` · ${c.grade}` : ''}</option>)}
             </select>
           </div>
           <div className="field" style={{ minWidth: 170 }}>

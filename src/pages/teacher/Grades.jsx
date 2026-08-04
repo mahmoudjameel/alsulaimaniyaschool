@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { orderBy, where } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import SearchInput from '../../components/SearchInput';
@@ -14,11 +15,17 @@ const STATUS_TONE = { 'قيد المراجعة': 'outline', 'معتمد': 'accen
 
 export default function Grades() {
   const { profile } = useAuth();
+  const [params] = useSearchParams();
   const { myClasses } = useMyClasses();
-  const [classId, setClassId] = useState('');
+  const [classId, setClassId] = useState(params.get('class') || '');
   const activeClassId = classId || myClasses[0]?.id || '';
   const activeClass = myClasses.find((c) => c.id === activeClassId);
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    const fromUrl = params.get('class');
+    if (fromUrl) setClassId(fromUrl);
+  }, [params]);
 
   const { data: enrolled } = useLiveOrDemo(
     activeClassId ? `classes/${activeClassId}/enrollments` : '__none__',
@@ -34,13 +41,10 @@ export default function Grades() {
     profile?.id
   );
 
-  const gradesForClass = useMemo(
-    () => {
-      const base = activeClassId ? myGrades.filter((g) => g.classId === activeClassId) : myGrades;
-      return base.filter((g) => matchesStudentSearch(g, search));
-    },
-    [myGrades, activeClassId, search],
-  );
+  const gradesForClass = useMemo(() => {
+    const base = activeClassId ? myGrades.filter((g) => g.classId === activeClassId) : myGrades;
+    return base.filter((g) => matchesStudentSearch(g, search));
+  }, [myGrades, activeClassId, search]);
 
   const [studentId, setStudentId] = useState('');
   const [assessmentTitle, setAssessmentTitle] = useState('');
@@ -80,19 +84,16 @@ export default function Grades() {
       <ErrorBanner>{error && 'تعذّر تحميل الدرجات.'}</ErrorBanner>
       <div className="ah-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 16, alignItems: 'start' }}>
         <form className="card" onSubmit={onSubmit}>
-          <div className="card-title" style={{ marginBottom: 8 }}>رصد درجة جديدة</div>
+          <div className="card-title" style={{ marginBottom: 8 }}>رصد درجة</div>
           <div className="field">
-            <label>المساق (صفوفي فقط)</label>
+            <label>الصف</label>
             <select className="input" value={activeClassId} onChange={(e) => { setClassId(e.target.value); setStudentId(''); setSearch(''); }}>
-              {myClasses.map((c) => <option key={c.id} value={c.id}>{c.title} — {c.subject}</option>)}
+              {myClasses.length === 0 && <option value="">لا صفوف مسندة</option>}
+              {myClasses.map((c) => <option key={c.id} value={c.id}>{c.title} — {c.subject}{c.grade ? ` · ${c.grade}` : ''}</option>)}
             </select>
           </div>
           <div style={{ marginTop: 10 }}>
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="بحث عن طالب بالاسم أو الرقم…"
-            />
+            <SearchInput value={search} onChange={setSearch} placeholder="بحث عن طالب بالاسم أو الرقم…" />
           </div>
           <div className="field" style={{ marginTop: 10 }}>
             <label>الطالب</label>
@@ -107,7 +108,7 @@ export default function Grades() {
           </div>
           <div className="field" style={{ marginTop: 10 }}>
             <label>عنوان التقييم</label>
-            <input className="input" value={assessmentTitle} onChange={(e) => setAssessmentTitle(e.target.value)} required placeholder="مثال: اختبار الوحدة 2" />
+            <input className="input" value={assessmentTitle} onChange={(e) => setAssessmentTitle(e.target.value)} required placeholder="مثال: اختبار شهري · فرض صفّي" />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
             <div className="field"><label>الدرجة</label><input className="input" type="number" value={score} onChange={(e) => setScore(e.target.value)} required dir="ltr" style={{ textAlign: 'right' }} /></div>
@@ -121,12 +122,12 @@ export default function Grades() {
 
         <div className="card ah-table-wrap" style={{ padding: 0 }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)' }}>
-            <div className="card-title" style={{ margin: 0 }}>درجاتي المرصودة</div>
+            <div className="card-title" style={{ margin: 0 }}>درجات هذا الصف</div>
           </div>
           <table className="table">
             <thead><tr><th>الطالب</th><th>التقييم</th><th>الدرجة</th><th>الحالة</th></tr></thead>
             <tbody>
-              {gradesForClass.length === 0 && <EmptyRow colSpan={4}>لا درجات مرصودة بعد لهذا المساق.</EmptyRow>}
+              {gradesForClass.length === 0 && <EmptyRow colSpan={4}>لا درجات مرصودة بعد لهذا الصف.</EmptyRow>}
               {gradesForClass.map((g) => (
                 <tr key={g.id}>
                   <td>{g.studentName}</td>
