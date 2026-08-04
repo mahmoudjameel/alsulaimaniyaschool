@@ -17,6 +17,7 @@ export const teacherObservationsQuery = (teacherId) => query(
 export async function createObservation({
   studentId, studentName, classId, className,
   teacherId, teacherName, kind, sentiment, note, visibleToParent, visibleToStudent = true,
+  scenarioId,
 }) {
   const payload = {
     studentId,
@@ -28,6 +29,7 @@ export async function createObservation({
     kind,
     sentiment,
     note,
+    scenarioId: scenarioId || null,
     visibleToParent: !!visibleToParent,
     visibleToStudent: visibleToStudent !== false,
     createdAt: serverTimestamp(),
@@ -35,6 +37,7 @@ export async function createObservation({
   const ref = await addDoc(observationsCol, payload);
   await addStudentNote(studentId, {
     kind, sentiment, note,
+    scenarioId: scenarioId || null,
     visibleToParent: !!visibleToParent,
     visibleToStudent: visibleToStudent !== false,
     by: teacherName || 'معلّم',

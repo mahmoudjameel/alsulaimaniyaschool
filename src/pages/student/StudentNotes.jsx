@@ -29,7 +29,7 @@ export default function StudentNotes() {
       <ErrorBanner>{(stuErr || error) && 'تعذّر تحميل ملاحظات المعلّمين.'}</ErrorBanner>
       <header className="stu-page-head">
         <h1 className="stu-page-title">ملاحظات المعلّمين</h1>
-        <p className="stu-page-lead">ملاحظات موجّهة لـ {displayName} من معلّمي الصف.</p>
+        <p className="stu-page-lead">تشجيع، متابعة دراسية، أو تنبيهات موجّهة لـ {displayName}.</p>
       </header>
 
       {visible.length === 0 && (
@@ -39,21 +39,37 @@ export default function StudentNotes() {
         </div>
       )}
 
-      {visible.map((n) => (
-        <article key={n.id} className="card stu-note">
-          <div className="stu-note-meta">
-            <span className="tag tag-outline">{n.kind || 'ملاحظة'}</span>
-            {n.sentiment && <span className="tag tag-neutral">{n.sentiment}</span>}
-            <span className="stu-feed-time" style={{ marginInlineStart: 'auto' }}>
-              {n.daysAgo != null ? `قبل ${n.daysAgo} يوم` : relativeFromTimestamp(n.createdAt)}
-            </span>
-          </div>
-          <p className="stu-note-text">{n.note || n.text}</p>
-          <div className="stu-class-meta">
-            {[n.by || n.authorName, n.className].filter(Boolean).join(' · ')}
-          </div>
-        </article>
-      ))}
+      {visible.map((n) => {
+        const toneLabel = n.sentiment === 'إيجابي'
+          ? 'تشجيع'
+          : n.sentiment === 'محايد'
+            ? 'محايد'
+            : 'متابعة';
+        const kindLabel = n.kind === 'سلوكي'
+          ? 'سلوك'
+          : n.kind === 'صحّي'
+            ? 'صحّة'
+            : n.kind === 'اجتماعي'
+              ? 'اجتماعي'
+              : n.kind === 'أكاديمي'
+                ? 'دراسي'
+                : (n.kind || 'ملاحظة');
+        return (
+          <article key={n.id} className="card stu-note">
+            <div className="stu-note-meta">
+              <span className="tag tag-outline">{kindLabel}</span>
+              <span className={`tag ${n.sentiment === 'إيجابي' ? 'tag-accent' : 'tag-neutral'}`}>{toneLabel}</span>
+              <span className="stu-feed-time" style={{ marginInlineStart: 'auto' }}>
+                {n.daysAgo != null ? `قبل ${n.daysAgo} يوم` : relativeFromTimestamp(n.createdAt)}
+              </span>
+            </div>
+            <p className="stu-note-text">{n.note || n.text}</p>
+            <div className="stu-class-meta">
+              {[n.by || n.authorName, n.className].filter(Boolean).join(' · ')}
+            </div>
+          </article>
+        );
+      })}
       {demo && <p className="stu-class-meta">وضع العرض التوضيحي.</p>}
     </div>
   );
