@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { orderBy } from 'firebase/firestore';
@@ -147,9 +148,14 @@ export default function Attendance() {
         </div>
 
         {message && <div style={{ fontSize: 13, color: 'var(--color-accent-700)', marginTop: 10 }}>{message}</div>}
-        <button type="submit" className="btn btn-primary" style={{ marginTop: 12, alignSelf: 'flex-start' }} disabled={submitting || enrolled.length === 0}>
-          <Icon name="fact_check" size={15} /> {submitting ? 'جارٍ الحفظ…' : 'حفظ الحضور'}
-        </button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
+          <button type="submit" className="btn btn-primary" disabled={submitting || enrolled.length === 0}>
+            <Icon name="fact_check" size={15} /> {submitting ? 'جارٍ الحفظ…' : 'حفظ الحضور'}
+          </button>
+          <Link to={`/teacher/attendance-report?class=${activeClassId}`} className="btn btn-secondary" style={{ textDecoration: 'none', fontSize: 13 }}>
+            تقرير شهري
+          </Link>
+        </div>
       </form>
     </div>
   );

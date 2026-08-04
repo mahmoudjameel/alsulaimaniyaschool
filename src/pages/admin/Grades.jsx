@@ -75,7 +75,14 @@ export default function Grades() {
               <tr key={g.id}>
                 <td>{g.studentName}</td>
                 <td>{g.className} <span style={{ color: 'var(--color-neutral-500)', fontSize: 12 }}>· {g.subject}</span></td>
-                <td>{g.assessmentTitle}</td>
+                <td>
+                  {g.assessmentTitle}
+                  {(g.assessmentType || g.term) && (
+                    <div style={{ fontSize: 11, color: 'var(--color-neutral-500)' }}>
+                      {[g.assessmentType, g.term].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
+                </td>
                 <td className="ah-tabnum">{g.score} / {g.maxScore}</td>
                 <td>{g.teacherName}</td>
                 <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>

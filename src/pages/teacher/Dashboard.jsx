@@ -8,10 +8,12 @@ import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { enrolledDisplayCount, useEnrollmentCounts } from '../../hooks/useEnrollmentCounts';
 
 const QUICK = [
+  { to: '/teacher/schedule', icon: 'calendar_month', title: 'جدول الحصص', body: 'حصص اليوم والأسبوع.' },
   { to: '/teacher/attendance', icon: 'fact_check', title: 'الحضور والغياب', body: 'تسجيل حضور صفّك لليوم.' },
-  { to: '/teacher/grades', icon: 'grade', title: 'الدرجات', body: 'رصد درجات وإرسالها للاعتماد.' },
-  { to: '/teacher/observations', icon: 'chat', title: 'الملاحظات', body: 'ملاحظات أكاديمية أو سلوكية للطالب.' },
-  { to: '/teacher/classes', icon: 'group', title: 'صفوفي وطلابي', body: 'عرض الصفوف وكشوف الأسماء.' },
+  { to: '/teacher/grades', icon: 'grade', title: 'الدرجات', body: 'امتحانات وفرض بانتظار الاعتماد.' },
+  { to: '/teacher/diary', icon: 'edit_note', title: 'دفتر اليوم', body: 'موضوع الحصة والواجب والتنبيه.' },
+  { to: '/teacher/attendance-report', icon: 'analytics', title: 'تقرير الحضور', body: 'من غاب كثيراً — للطباعة.' },
+  { to: '/teacher/classes', icon: 'group', title: 'صفوفي وطلابي', body: 'كشف الأسماء وملف الطالب.' },
 ];
 
 export default function TeacherDashboard() {

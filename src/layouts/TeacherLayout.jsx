@@ -6,9 +6,12 @@ import { useAuth } from '../context/AuthContext';
 
 const NAV_PRIMARY = [
   { to: '/teacher', end: true, label: 'لوحتي', icon: 'dashboard' },
+  { to: '/teacher/schedule', label: 'جدول الحصص', icon: 'calendar_month' },
   { to: '/teacher/classes', label: 'صفوفي وطلابي', icon: 'school' },
   { to: '/teacher/attendance', label: 'الحضور والغياب', icon: 'fact_check' },
+  { to: '/teacher/attendance-report', label: 'تقرير الحضور', icon: 'analytics' },
   { to: '/teacher/grades', label: 'الدرجات', icon: 'grade' },
+  { to: '/teacher/diary', label: 'دفتر اليوم', icon: 'edit_note' },
   { to: '/teacher/observations', label: 'الملاحظات', icon: 'chat' },
 ];
 
@@ -19,9 +22,12 @@ const NAV_EXTRA = [
 
 const TITLES = {
   '/teacher': 'لوحة المعلّم',
+  '/teacher/schedule': 'جدول الحصص',
   '/teacher/classes': 'صفوفي وطلابي',
   '/teacher/attendance': 'الحضور والغياب',
+  '/teacher/attendance-report': 'تقرير الحضور',
   '/teacher/grades': 'الدرجات',
+  '/teacher/diary': 'دفتر اليوم',
   '/teacher/observations': 'الملاحظات',
   '/teacher/builder': 'محتوى الدروس',
   '/teacher/quiz': 'الاختبارات',
@@ -100,15 +106,15 @@ export default function TeacherLayout() {
 
   return (
     <div className="panel-shell ah-admin-shell">
-      <aside className="panel-aside ah-admin-aside ah-scroll panel-aside--desktop">{nav}</aside>
+      <aside className="panel-aside ah-admin-aside ah-scroll panel-aside--desktop no-print">{nav}</aside>
       {menuOpen && (
-        <div className="panel-drawer" role="dialog" aria-modal="true">
+        <div className="panel-drawer no-print" role="dialog" aria-modal="true">
           <button type="button" className="panel-drawer-backdrop" aria-label="إغلاق" onClick={() => setMenuOpen(false)} />
           <aside className="panel-aside panel-aside--drawer ah-scroll">{nav}</aside>
         </div>
       )}
       <main className="panel-main ah-admin-main ah-scroll">
-        <header className="panel-topbar">
+        <header className="panel-topbar no-print">
           <button type="button" className="panel-menu-btn" aria-label="فتح القائمة" onClick={() => setMenuOpen(true)}>
             <Icon name="menu" size={22} />
           </button>

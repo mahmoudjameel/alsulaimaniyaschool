@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { orderBy } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import SearchInput from '../../components/SearchInput';
+import TeacherStudentPeek from '../../components/TeacherStudentPeek';
 import { EmptyRow, ErrorBanner } from '../../components/ui';
 import { useMyClasses } from '../../hooks/useMyClasses';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
@@ -14,6 +15,7 @@ export default function TeacherClassDetail() {
   const { myClasses, error, demo } = useMyClasses();
   const cls = myClasses.find((c) => c.id === id);
   const [search, setSearch] = useState('');
+  const [peekId, setPeekId] = useState(null);
 
   const { data: enrolled } = useLiveOrDemo(
     id ? `classes/${id}/enrollments` : '__none__',
@@ -53,8 +55,14 @@ export default function TeacherClassDetail() {
           <Link to={`/teacher/attendance?class=${id}`} className="btn btn-primary" style={{ fontSize: 13, textDecoration: 'none' }}>
             <Icon name="fact_check" size={15} /> حضور وغياب
           </Link>
+          <Link to={`/teacher/attendance-report?class=${id}`} className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
+            <Icon name="analytics" size={15} /> تقرير حضور
+          </Link>
           <Link to={`/teacher/grades?class=${id}`} className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
             <Icon name="grade" size={15} /> درجات
+          </Link>
+          <Link to={`/teacher/diary?class=${id}`} className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
+            <Icon name="edit_note" size={15} /> دفتر اليوم
           </Link>
           <Link to={`/teacher/observations?class=${id}`} className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
             <Icon name="chat" size={15} /> ملاحظات
@@ -76,21 +84,39 @@ export default function TeacherClassDetail() {
                 <th>الطالب</th>
                 <th>الرقم الدراسي</th>
                 <th>الصف / المرحلة</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              {list.length === 0 && <EmptyRow colSpan={3}>لا طلاب في هذا الصف{search ? ' مطابقة للبحث' : ''}.</EmptyRow>}
-              {list.map((s) => (
-                <tr key={s.studentId || s.id}>
-                  <td>{s.studentName || s.name}</td>
-                  <td className="ah-tabnum">{s.displayId || '—'}</td>
-                  <td>{s.grade || cls?.grade || '—'}</td>
-                </tr>
-              ))}
+              {list.length === 0 && <EmptyRow colSpan={4}>لا طلاب في هذا الصف{search ? ' مطابقة للبحث' : ''}.</EmptyRow>}
+              {list.map((s) => {
+                const sid = s.studentId || s.id;
+                return (
+                  <tr key={sid}>
+                    <td>{s.studentName || s.name}</td>
+                    <td className="ah-tabnum">{s.displayId || '—'}</td>
+                    <td>{s.grade || cls?.grade || '—'}</td>
+                    <td style={{ textAlign: 'left' }}>
+                      <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setPeekId(sid)}>
+                        ملف سريع
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
+
+      {peekId && (
+        <TeacherStudentPeek
+          studentId={peekId}
+          classId={id}
+          classTitle={cls?.title}
+          onClose={() => setPeekId(null)}
+        />
+      )}
     </div>
   );
 }

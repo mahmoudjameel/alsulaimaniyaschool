@@ -15,11 +15,21 @@ export function scoreToBand(score, maxScore) {
 
 /** Teacher submits a grade for one student — always lands as "قيد المراجعة"
  * (enforced by firestore.rules too) until an admin approves it. */
-export async function submitGrade({ classId, className, subject, studentId, studentName, teacherId, teacherName, assessmentTitle, score, maxScore, term }) {
+export const ASSESSMENT_TYPES = ['اختبار شهري', 'نصف فصل', 'نهاية فصل', 'فرض صفّي', 'أخرى'];
+
+export async function submitGrade({
+  classId, className, subject, studentId, studentName, teacherId, teacherName,
+  assessmentTitle, score, maxScore, term, assessmentType,
+}) {
   const ref = await addDoc(gradeEntriesCol, {
     classId, className, subject, studentId, studentName, teacherId, teacherName,
-    assessmentTitle, score: Number(score), maxScore: Number(maxScore), term: term || '',
-    status: 'قيد المراجعة', createdAt: serverTimestamp(),
+    assessmentTitle,
+    assessmentType: assessmentType || '',
+    score: Number(score),
+    maxScore: Number(maxScore),
+    term: term || '',
+    status: 'قيد المراجعة',
+    createdAt: serverTimestamp(),
   });
   await logActivity({
     type: 'grade_submitted', actorUid: teacherId, actorName: teacherName, actorRole: 'teacher',
