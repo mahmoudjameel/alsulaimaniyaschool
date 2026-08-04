@@ -1,0 +1,274 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Role + fine-grained permission helpers ----
+    // Two layers, by design: `role` is the hard security boundary (what a
+    // user account fundamentally is), while `permissions` is an admin-
+    // editable map (see src/lib/permissions.js) that fine-tunes which
+    // screens/actions a staff member gets *within* what their role allows.
+    // Firestore caches repeated get()s to the same doc within one
+    // evaluation, so calling myUser() several times below is cheap.
+    function isSignedIn() { return request.auth != null; }
+    function myUser() {
+      return isSignedIn()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        : null;
+    }
+    function myRole() { return isSignedIn() ? myUser().role : null; }
+    function isAdmin() { return myRole() == 'admin'; }
+    function isTeacher() { return myRole() == 'teacher'; }
+    function isAccountant() { return myRole() == 'accountant'; }
+    function isReception() { return myRole() == 'reception'; }
+    function isStaff() { return isAdmin() || isTeacher() || isAccountant() || isReception(); }
+    function hasPerm(key) {
+      return isAdmin() || (isSignedIn() && myUser().permissions != null && myUser().permissions[key] == true);
+    }
+
+    // Everything not explicitly opened below is closed by default.
+    match /{document=**} { allow read, write: if false; }
+
+    // ---- Accounts ----
+    // Own profile: any signed-in user. Staff list + permission edits:
+    // admin OR anyone granted users.manage (so delegated managers work).
+    // Creating accounts always goes through Cloud Functions (Admin SDK).
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin() || hasPerm('users.manage'));
+      allow update: if isAdmin() || hasPerm('users.manage');
+      allow create, delete: if false;
+    }
+
+    // ---- Admissions ----
+    // The public marketing site's registration form creates a request with
+    // no auth at all; only staff with the permission can review the queue.
+    match /admissions/{id} {
+      allow create: if request.resource.data.status == 'review';
+      allow read, update: if hasPerm('admissions.manage');
+    }
+
+    // ---- Students ----
+    match /students/{studentId} {
+      allow read: if isStaff()
+        || resource.data.guardianUid == request.auth.uid
+        || resource.data.studentUid == request.auth.uid;
+      allow create, update: if hasPerm('students.manage');
+
+      match /ledger/{entryId} {
+        allow read: if isStaff()
+          || get(/databases/$(database)/documents/students/$(studentId)).data.guardianUid == request.auth.uid
+          || get(/databases/$(database)/documents/students/$(studentId)).data.studentUid == request.auth.uid;
+        allow write: if hasPerm('billing.manage');
+      }
+      match /documents/{docId} {
+        allow read: if isStaff() || get(/databases/$(database)/documents/students/$(studentId)).data.guardianUid == request.auth.uid;
+        allow write: if hasPerm('students.manage');
+      }
+      // Daily attendance, one record per class per date (deterministic id
+      // `${classId}_${date}`) — mirrored from classes/{id}/attendanceSessions
+      // so a student's/parent's full attendance history is a flat,
+      // ordered subcollection instead of a fan-out query across classes.
+      match /attendanceRecords/{entryId} {
+        allow read: if isStaff()
+          || get(/databases/$(database)/documents/students/$(studentId)).data.guardianUid == request.auth.uid
+          || get(/databases/$(database)/documents/students/$(studentId)).data.studentUid == request.auth.uid;
+        allow create, update: if hasPerm('classes.manage')
+          || (isTeacher() && request.resource.data.teacherId == request.auth.uid);
+      }
+      match /guardians/{entryId} {
+        allow read: if isStaff() || get(/databases/$(database)/documents/students/$(studentId)).data.guardianUid == request.auth.uid;
+        allow write: if hasPerm('students.manage');
+      }
+      match /classes/{entryId} {
+        allow read: if isStaff()
+          || get(/databases/$(database)/documents/students/$(studentId)).data.guardianUid == request.auth.uid
+          || get(/databases/$(database)/documents/students/$(studentId)).data.studentUid == request.auth.uid;
+        allow write: if hasPerm('enrollment.manage');
+      }
+      match /notes/{noteId} {
+        allow read: if isStaff()
+          || get(/databases/$(database)/documents/students/$(studentId)).data.studentUid == request.auth.uid
+          || (
+            get(/databases/$(database)/documents/students/$(studentId)).data.guardianUid == request.auth.uid
+            && resource.data.visibleToParent == true
+          );
+        allow write: if isStaff();
+      }
+    }
+
+    // ---- Billing / payroll / expenses ----
+    function chargeBelongsToCaller(data) {
+      return data.studentId != null
+        && (
+          get(/databases/$(database)/documents/students/$(data.studentId)).data.guardianUid == request.auth.uid
+          || get(/databases/$(database)/documents/students/$(data.studentId)).data.studentUid == request.auth.uid
+        );
+    }
+    match /charges/{id} {
+      allow read: if hasPerm('billing.manage') || (isSignedIn() && chargeBelongsToCaller(resource.data));
+      allow create, update: if hasPerm('billing.manage');
+    }
+
+    // Parent bank-transfer payment proofs (receipt image + payer details).
+    // Balance/ledger change ONLY on staff approve — never on create.
+    function isGuardianOfStudent(studentId) {
+      return isSignedIn()
+        && get(/databases/$(database)/documents/students/$(studentId)).data.guardianUid == request.auth.uid;
+    }
+    match /paymentProofs/{id} {
+      allow create: if isSignedIn()
+        && request.resource.data.guardianUid == request.auth.uid
+        && request.resource.data.status == 'قيد المراجعة'
+        && request.resource.data.studentId is string
+        && isGuardianOfStudent(request.resource.data.studentId)
+        && request.resource.data.amountMinorUnits is int
+        && request.resource.data.amountMinorUnits > 0
+        && request.resource.data.receiptUrl is string
+        && request.resource.data.payerName is string
+        && request.resource.data.payerPhone is string
+        && request.resource.data.bankAccountName is string;
+      allow read: if hasPerm('billing.manage') || hasPerm('payments.manage')
+        || (isSignedIn() && resource.data.guardianUid == request.auth.uid);
+      allow update: if (hasPerm('billing.manage') || hasPerm('payments.manage'))
+        && resource.data.status == 'قيد المراجعة'
+        && (request.resource.data.status == 'معتمد' || request.resource.data.status == 'مرفوض')
+        && request.resource.data.amountMinorUnits == resource.data.amountMinorUnits
+        && request.resource.data.studentId == resource.data.studentId
+        && request.resource.data.guardianUid == resource.data.guardianUid;
+      allow delete: if false;
+    }
+
+    match /payroll/{id} { allow read, write: if hasPerm('payroll.manage'); }
+    match /staff/{id} {
+      allow read, write: if hasPerm('payroll.manage') || hasPerm('staff.manage');
+      match /attendance/{period} { allow read, write: if hasPerm('payroll.manage') || hasPerm('staff.manage'); }
+    }
+    match /disbursements/{id} {
+      allow read, create: if hasPerm('disbursements.manage') || hasPerm('payroll.manage') || hasPerm('expenses.manage') || hasPerm('billing.manage');
+      allow update: if hasPerm('disbursements.manage') || hasPerm('payroll.manage') || hasPerm('expenses.manage') || hasPerm('billing.manage');
+      allow delete: if isAdmin();
+    }
+    match /expenses/{id} { allow read, create: if hasPerm('expenses.manage'); allow update: if hasPerm('expenses.manage'); }
+    match /feeTemplates/{grade} { allow read, write: if hasPerm('billing.manage'); }
+
+    match /studentDiscounts/{id} {
+      allow read, create: if hasPerm('billing.manage');
+      allow update, delete: if isAdmin();
+    }
+    match /installmentPlans/{id} {
+      allow read, create: if hasPerm('billing.manage');
+      allow update: if hasPerm('billing.manage');
+    }
+    match /installments/{id} {
+      allow read, create: if hasPerm('billing.manage');
+      allow update: if hasPerm('billing.manage');
+    }
+    match /absenceExcuses/{id} {
+      allow create: if isSignedIn()
+        && request.resource.data.guardianUid == request.auth.uid
+        && request.resource.data.status == 'قيد المراجعة'
+        && request.resource.data.studentId is string
+        && isGuardianOfStudent(request.resource.data.studentId);
+      allow read: if hasPerm('students.manage') || hasPerm('classes.manage')
+        || (isSignedIn() && resource.data.guardianUid == request.auth.uid);
+      allow update: if hasPerm('students.manage') || hasPerm('classes.manage');
+      allow delete: if isAdmin();
+    }
+
+    // ---- Classes & academics ----
+    match /classes/{classId} {
+      allow read: if resource.data.visibility == 'عام' || isSignedIn();
+      allow create, update: if hasPerm('classes.manage');
+      match /lessons/{lessonId} { allow read: if isSignedIn(); allow write: if hasPerm('classes.manage'); }
+      match /quizzes/{quizId} { allow read: if isSignedIn(); allow write: if hasPerm('classes.manage'); }
+      match /enrollments/{studentId} { allow read: if isStaff(); allow write: if hasPerm('enrollment.manage'); }
+      // One doc per calendar date (id = 'YYYY-MM-DD') holding every
+      // enrolled student's status for that session. The teacher who owns
+      // the class takes it; admin (classes.manage) can correct it.
+      match /attendanceSessions/{date} {
+        allow read: if isStaff();
+        allow create, update: if hasPerm('classes.manage')
+          || (isTeacher() && request.resource.data.teacherId == request.auth.uid);
+      }
+    }
+
+    // ---- Grades — teacher submits, admin (or a delegated permission) approves ----
+    function gradeBelongsToCaller(data) {
+      return data.studentId != null
+        && (get(/databases/$(database)/documents/students/$(data.studentId)).data.guardianUid == request.auth.uid
+          || get(/databases/$(database)/documents/students/$(data.studentId)).data.studentUid == request.auth.uid);
+    }
+    match /gradeEntries/{id} {
+      allow read: if isStaff() || (isSignedIn() && gradeBelongsToCaller(resource.data));
+      allow create: if isTeacher()
+        && request.resource.data.teacherId == request.auth.uid
+        && request.resource.data.status == 'قيد المراجعة';
+      // A teacher may only edit their own still-pending entry (e.g. fix a
+      // typo) and must leave it pending — flipping status to معتمد/مرفوض
+      // requires hasPerm('grades.approve'). Without that second check a
+      // teacher could "edit" their own grade straight to معتمد themselves.
+      allow update: if hasPerm('grades.approve')
+        || (isTeacher() && resource.data.teacherId == request.auth.uid
+          && resource.data.status == 'قيد المراجعة' && request.resource.data.status == 'قيد المراجعة');
+    }
+
+    // Student quiz submissions (auto-scored where possible).
+    match /quizAttempts/{id} {
+      allow create: if isSignedIn()
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.studentId is string
+        && request.resource.data.quizId is string
+        && request.resource.data.classId is string;
+      allow read: if isStaff()
+        || (isSignedIn() && resource.data.studentUid == request.auth.uid);
+      allow update, delete: if false;
+    }
+
+    // ---- Teacher directory — public-safe profile (name/subject/bio), never
+    // salary — that stays in /staff which only finance can read. ----
+    match /teacherProfiles/{id} {
+      allow read: if true;
+      allow create, update: if hasPerm('classes.manage') || hasPerm('teachers.manage');
+    }
+
+    // ---- Academic stages (admin-managed grade list for forms) ----
+    match /academicStages/{id} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() || hasPerm('stages.manage');
+    }
+
+    // ---- Teacher observations (cross-student feed for the teacher portal) ----
+    match /observations/{id} {
+      allow create: if isTeacher()
+        && request.resource.data.teacherId == request.auth.uid;
+      allow read: if isStaff()
+        || (isSignedIn() && resource.data.teacherId == request.auth.uid);
+      allow update, delete: if isAdmin()
+        || (isTeacher() && resource.data.teacherId == request.auth.uid);
+    }
+
+    // ---- Activity log — immutable audit trail ----
+    match /activityLog/{id} {
+      allow create: if isSignedIn()
+        && request.resource.data.actorUid == request.auth.uid
+        && (isStaff()
+          || (myRole() == 'parent' && request.resource.data.type == 'payment_submitted'));
+      allow read: if isAdmin() || hasPerm('activity.view');
+      allow update, delete: if false;
+    }
+
+    // ---- Public site content ----
+    match /articles/{id} {
+      allow read: if resource.data.status == 'منشور' || isAdmin() || hasPerm('cms.manage');
+      allow create, update: if hasPerm('cms.manage');
+    }
+    match /announcements/{id} {
+      allow read: if resource.data.status == 'منشور' || isSignedIn();
+      allow create, update: if hasPerm('cms.manage');
+    }
+    match /comments/{id} {
+      allow create: if request.resource.data.status == 'قيد المراجعة';
+      allow read, update: if hasPerm('cms.manage');
+    }
+  }
+}

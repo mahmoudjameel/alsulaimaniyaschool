@@ -1,0 +1,57 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() { return request.auth != null; }
+    function myRole() {
+      return isSignedIn()
+        ? firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role
+        : null;
+    }
+    function isStaff() { return myRole() == 'admin' || myRole() == 'teacher' || myRole() == 'accountant'; }
+    function studentDoc(studentId) {
+      return firestore.get(/databases/(default)/documents/students/$(studentId)).data;
+    }
+    function isGuardianOf(studentId) {
+      return isSignedIn() && studentDoc(studentId).guardianUid == request.auth.uid;
+    }
+    function isStudentOf(studentId) {
+      return isSignedIn() && studentDoc(studentId).studentUid == request.auth.uid;
+    }
+    function isImageOrPdf() {
+      return request.resource.contentType.matches('image/.*')
+        || request.resource.contentType == 'application/pdf';
+    }
+
+    // Student files — staff manage; guardian/student may read their own.
+    match /students/{studentId}/{allPaths=**} {
+      allow read: if isStaff() || isGuardianOf(studentId) || isStudentOf(studentId);
+      allow write: if isStaff()
+        && request.resource.size < 10 * 1024 * 1024
+        && isImageOrPdf();
+    }
+
+    // Parent payment-proof uploads (bank-transfer receipt images).
+    // More specific path also grants guardian write (OR with the staff rule above).
+    match /students/{studentId}/payment-proofs/{fileName} {
+      allow read: if isStaff() || isGuardianOf(studentId);
+      allow write: if (isStaff() || isGuardianOf(studentId))
+        && request.resource.size < 8 * 1024 * 1024
+        && isImageOrPdf();
+    }
+
+    // Lesson/class media (cover images, attachments) — staff-authored,
+    // publicly readable since classes can be public-facing content.
+    match /classes/{classId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isStaff() && request.resource.size < 25 * 1024 * 1024;
+    }
+
+    // CMS media (article/announcement images).
+    match /content/{allPaths=**} {
+      allow read: if true;
+      allow write: if isStaff() && request.resource.size < 15 * 1024 * 1024;
+    }
+  }
+}
