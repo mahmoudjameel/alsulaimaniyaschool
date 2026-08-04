@@ -4,7 +4,9 @@ import { orderBy, where } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import { ErrorBanner } from '../../components/ui';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
-import { filterStudentAnnouncements, useMyStudent } from '../../hooks/useMyStudent';
+import { useTodayDayLogsMap } from '../../hooks/useClassDayLogsMap';
+import { useClassDocsMap } from '../../hooks/useClassDocsMap';
+import { filterStudentAnnouncements, useMyStudent, useStudentClassIds } from '../../hooks/useMyStudent';
 import { relativeFromTimestamp, relativeHoursAr } from '../../lib/relativeTime';
 import {
   demoAnnouncements,
@@ -14,7 +16,11 @@ import {
 } from '../../data/demo';
 
 export default function StudentInbox() {
-  const { student, studentId, error: stuErr } = useMyStudent();
+  const { student, studentId, enrolled, demo, error: stuErr } = useMyStudent();
+  const classIds = useStudentClassIds(enrolled, demo);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayLogs = useTodayDayLogsMap(demo ? [] : classIds, todayStr);
+  const classDocs = useClassDocsMap(demo ? [] : classIds);
 
   const { data: gradesRaw } = useLiveOrDemo(
     'gradeEntries',
@@ -43,14 +49,44 @@ export default function StudentInbox() {
 
   const items = useMemo(() => {
     const out = [];
+
+    Object.entries(todayLogs || {}).forEach(([classId, log]) => {
+      if (!log) return;
+      const doc = classDocs[classId];
+      const meta = (enrolled || []).find((e) => (e.classId || e.id) === classId);
+      const className = doc?.title || meta?.title || meta?.className || 'صف';
+      if (log.notice) {
+        out.push({
+          id: `notice-${classId}-${todayStr}`,
+          icon: 'campaign',
+          title: `تنبيه صف: ${className}`,
+          meta: log.notice,
+          to: '/student/today',
+          sort: Date.now(),
+          time: 'اليوم',
+        });
+      }
+      if (log.homework) {
+        out.push({
+          id: `hw-${classId}-${todayStr}`,
+          icon: 'assignment',
+          title: `واجب اليوم — ${className}`,
+          meta: log.homework,
+          to: '/student/homework',
+          sort: Date.now() - 1,
+          time: 'اليوم',
+        });
+      }
+    });
+
     (grades || []).slice(0, 8).forEach((g) => {
       out.push({
         id: `g-${g.id}`,
         icon: 'grade',
         title: `درجة معتمدة: ${g.assessmentTitle || 'تقييم'}`,
-        meta: `${g.subject || ''} · ${g.score}/${g.maxScore}`,
+        meta: [g.assessmentType, g.subject, `${g.score}/${g.maxScore}`].filter(Boolean).join(' · '),
         to: '/student/grades',
-        sort: g.createdAt?.toMillis?.() || 0,
+        sort: g.createdAt?.toMillis?.() || g.decidedAt?.toMillis?.() || 0,
         time: relativeFromTimestamp(g.createdAt) || relativeFromTimestamp(g.decidedAt),
       });
     });
@@ -88,14 +124,14 @@ export default function StudentInbox() {
       });
     });
     return out.sort((a, b) => b.sort - a.sort).slice(0, 25);
-  }, [grades, attendance, notes, announcements, student]);
+  }, [grades, attendance, notes, announcements, student, todayLogs, classDocs, enrolled, todayStr]);
 
   return (
     <div className="stu-page">
       <ErrorBanner>{stuErr && 'تعذّر تحميل التنبيهات.'}</ErrorBanner>
       <header className="stu-page-head">
         <h1 className="stu-page-title">تنبيهاتي</h1>
-        <p className="stu-page-lead">درجات جديدة، غياب، ملاحظات المعلّمين، وإعلانات المدرسة.</p>
+        <p className="stu-page-lead">واجبات وتنبيهات دفتر اليوم، درجات، غياب، ملاحظات، وإعلانات.</p>
       </header>
 
       {items.length === 0 && (

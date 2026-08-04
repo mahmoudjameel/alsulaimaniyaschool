@@ -2,19 +2,20 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import { ErrorBanner } from '../../components/ui';
-import { useClassLessonsMap } from '../../hooks/useClassLessonsMap';
+import { useClassDocsMap } from '../../hooks/useClassDocsMap';
+import { useTodayDayLogsMap } from '../../hooks/useClassDayLogsMap';
 import { useMyStudent, useStudentClassIds } from '../../hooks/useMyStudent';
+import { slotsForDay, todaySchoolDay } from '../../lib/schedule';
 import { demoStudentClasses } from '../../data/demo';
-
-const WEEKDAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 
 export default function StudentToday() {
   const { enrolled, demo, error, gradeLabel } = useMyStudent();
   const classIds = useStudentClassIds(enrolled, demo);
-  const lessonsByClass = useClassLessonsMap(demo ? [] : classIds);
+  const classDocs = useClassDocsMap(demo ? [] : classIds);
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
-  const weekday = WEEKDAYS[today.getDay()];
+  const weekday = todaySchoolDay(today);
+  const todayLogs = useTodayDayLogsMap(demo ? [] : classIds, todayStr);
 
   const scheduleRows = useMemo(() => {
     if (demo) {
@@ -22,36 +23,79 @@ export default function StudentToday() {
         id: `sch-${i}`,
         title: c.title,
         subject: c.subject,
-        when: i === 0 ? 'الحصة القادمة' : 'هذا الأسبوع',
+        when: i === 0 ? '08:00' : 'هذا الأسبوع',
         detail: c.next,
+        topic: null,
       }));
     }
-    const fromEnrolled = (enrolled || []).map((e) => ({
-      id: e.id || e.classId,
-      title: e.title || e.className,
-      subject: e.subject,
-      when: e.shift || 'صباحي',
-      detail: Array.isArray(e.schedule) ? e.schedule.join(' · ') : (e.teacher || e.teacherName || ''),
-    }));
-    const scheduledLessons = [];
-    Object.entries(lessonsByClass).forEach(([classId, lessons]) => {
-      const meta = (enrolled || []).find((e) => (e.classId || e.id) === classId);
-      (lessons || [])
-        .filter((l) => l.scheduledFor === todayStr || (l.scheduledFor && l.scheduledFor >= todayStr))
-        .filter((l) => !l.status || l.status === 'منشور' || l.status === 'مجدول' || l.published)
-        .slice(0, 5)
-        .forEach((l) => {
-          scheduledLessons.push({
-            id: `${classId}-${l.id}`,
-            title: l.title,
-            subject: meta?.subject || 'درس مجدول',
-            when: l.scheduledFor === todayStr ? 'اليوم' : l.scheduledFor,
-            detail: [l.chapterTitle, l.authorName || meta?.teacher || meta?.teacherName].filter(Boolean).join(' · '),
-          });
-        });
+    const classes = classIds
+      .map((id) => classDocs[id])
+      .filter(Boolean);
+    const slots = slotsForDay(classes, weekday);
+    if (slots.length > 0) {
+      return slots.map((row) => {
+        const log = todayLogs[row.classId];
+        return {
+          id: `${row.classId}-${row.start}`,
+          classId: row.classId,
+          title: row.title,
+          subject: row.subject,
+          when: row.end ? `${row.start} – ${row.end}` : row.start,
+          detail: [row.grade, row.shift].filter(Boolean).join(' · '),
+          topic: log?.topic || null,
+          homework: log?.homework || null,
+          notice: log?.notice || null,
+        };
+      });
+    }
+    // Fallback: enrolled classes with today's diary even if no schedule slots
+    return (enrolled || []).map((e) => {
+      const id = e.classId || e.id;
+      const doc = classDocs[id];
+      const log = todayLogs[id];
+      return {
+        id,
+        classId: id,
+        title: doc?.title || e.title || e.className,
+        subject: doc?.subject || e.subject,
+        when: doc?.shift || e.shift || 'صباحي',
+        detail: doc?.teacher || e.teacher || e.teacherName || '',
+        topic: log?.topic || null,
+        homework: log?.homework || null,
+        notice: log?.notice || null,
+      };
     });
-    return [...scheduledLessons, ...fromEnrolled];
-  }, [demo, enrolled, lessonsByClass, todayStr]);
+  }, [demo, classIds, classDocs, weekday, todayLogs, enrolled]);
+
+  const diaryCards = useMemo(() => {
+    if (demo) {
+      return [{
+        id: 'demo-diary',
+        title: demoStudentClasses[0]?.title || 'صف',
+        subject: demoStudentClasses[0]?.subject,
+        topic: 'مراجعة الحروف',
+        homework: 'حل تمارين الصفحة 12',
+        notice: 'إحضار دفتر الإملاء غداً',
+      }];
+    }
+    return classIds
+      .map((id) => {
+        const log = todayLogs[id];
+        if (!log || (!log.topic && !log.homework && !log.notice)) return null;
+        const doc = classDocs[id];
+        const meta = (enrolled || []).find((e) => (e.classId || e.id) === id);
+        return {
+          id,
+          title: doc?.title || meta?.title || meta?.className || 'صف',
+          subject: doc?.subject || meta?.subject,
+          topic: log.topic,
+          homework: log.homework,
+          notice: log.notice,
+          teacher: log.teacherName || doc?.teacher,
+        };
+      })
+      .filter(Boolean);
+  }, [demo, classIds, todayLogs, classDocs, enrolled]);
 
   return (
     <div className="stu-page">
@@ -65,18 +109,21 @@ export default function StudentToday() {
       </header>
 
       <div className="stu-actions-row">
-        <Link to="/student/classes" className="btn btn-primary" style={{ fontSize: 13, textDecoration: 'none' }}>
-          <Icon name="menu_book" size={15} /> فتح صفوفي
+        <Link to="/student/homework" className="btn btn-primary" style={{ fontSize: 13, textDecoration: 'none' }}>
+          <Icon name="assignment" size={15} /> الواجبات
         </Link>
-        <Link to="/student/homework" className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
-          الواجبات
+        <Link to="/student/grades" className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
+          الدرجات
+        </Link>
+        <Link to="/student/classes" className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
+          صفوفي
         </Link>
       </div>
 
       <section className="card">
-        <h2 className="card-title" style={{ marginBottom: 12 }}>جدول / حصص مرتبطة</h2>
+        <h2 className="card-title" style={{ marginBottom: 12 }}>حصص اليوم</h2>
         {scheduleRows.length === 0 && (
-          <p className="stu-empty">لا حصص معروضة اليوم. راجع صفوفك المسجّلة أو انتظر جدولة المعلّم.</p>
+          <p className="stu-empty">لا حصص مجدولة لك اليوم. راجع صفوفك أو انتظر ضبط الجدول من الإدارة.</p>
         )}
         {scheduleRows.map((row) => (
           <div key={row.id} className="stu-class-row">
@@ -84,8 +131,39 @@ export default function StudentToday() {
             <div className="stu-class-body">
               <div className="stu-class-name">{row.title}</div>
               <div className="stu-class-meta">{[row.subject, row.detail].filter(Boolean).join(' · ')}</div>
+              {row.topic && <div className="stu-class-meta" style={{ marginTop: 4 }}>موضوع الحصة: {row.topic}</div>}
             </div>
-            <span className="tag tag-outline">{row.when}</span>
+            <span className="tag tag-outline" dir="ltr">{row.when}</span>
+          </div>
+        ))}
+      </section>
+
+      <section className="card">
+        <h2 className="card-title" style={{ marginBottom: 12 }}>دفتر اليوم من المعلّم</h2>
+        {diaryCards.length === 0 && (
+          <p className="stu-empty">لم يُسجّل المعلّم موضوعاً أو واجباً أو تنبيهاً لهذا اليوم بعد.</p>
+        )}
+        {diaryCards.map((d) => (
+          <div key={d.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--line)' }}>
+            <div className="stu-class-name">{d.title}</div>
+            <div className="stu-class-meta" style={{ marginBottom: 8 }}>
+              {[d.subject, d.teacher].filter(Boolean).join(' · ')}
+            </div>
+            {d.topic && (
+              <div style={{ fontSize: 13, marginBottom: 6 }}>
+                <strong>الموضوع:</strong> {d.topic}
+              </div>
+            )}
+            {d.homework && (
+              <div style={{ fontSize: 13, marginBottom: 6 }}>
+                <strong>الواجب:</strong> {d.homework}
+              </div>
+            )}
+            {d.notice && (
+              <div style={{ fontSize: 13, color: 'var(--color-accent-800)' }}>
+                <strong>تنبيه:</strong> {d.notice}
+              </div>
+            )}
           </div>
         ))}
       </section>

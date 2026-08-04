@@ -191,8 +191,9 @@ service cloud.firestore {
           || (isTeacher() && request.resource.data.teacherId == request.auth.uid);
       }
       // Teacher daily notebook: topic / homework / short notice for the class.
+      // Students & parents (signed-in) can read so diary surfaces on their portals.
       match /dayLogs/{date} {
-        allow read: if isStaff();
+        allow read: if isStaff() || isSignedIn();
         allow create, update: if hasPerm('classes.manage')
           || (isTeacher() && request.resource.data.teacherId == request.auth.uid);
       }

@@ -24,7 +24,7 @@ export default function StudentGrades() {
       <ErrorBanner>{(stuErr || error) && 'تعذّر تحميل الدرجات.'}</ErrorBanner>
       <header className="stu-page-head">
         <h1 className="stu-page-title">درجاتي</h1>
-        <p className="stu-page-lead">الدرجات المعتمدة للعام {CURRENT_ACADEMIC_YEAR} — {displayName}</p>
+        <p className="stu-page-lead">الدرجات المعتمدة (امتحان شهري / نصف فصل / نهاية فصل…) للعام {CURRENT_ACADEMIC_YEAR} — {displayName}</p>
       </header>
 
       <div className="stu-actions-row">
@@ -44,6 +44,7 @@ export default function StudentGrades() {
           <thead>
             <tr>
               <th>التقييم</th>
+              <th>النوع</th>
               <th>المادة</th>
               <th>الدرجة</th>
               <th>التقدير</th>
@@ -51,7 +52,7 @@ export default function StudentGrades() {
             </tr>
           </thead>
           <tbody>
-            {approved.length === 0 && <EmptyRow colSpan={5}>لا درجات معتمدة بعد.</EmptyRow>}
+            {approved.length === 0 && <EmptyRow colSpan={6}>لا درجات معتمدة بعد.</EmptyRow>}
             {approved.map((g) => {
               const pct = g.maxScore ? Math.round((Number(g.score) / Number(g.maxScore)) * 100) : null;
               return (
@@ -60,6 +61,7 @@ export default function StudentGrades() {
                     <div style={{ fontWeight: 600 }}>{g.assessmentTitle || 'تقييم'}</div>
                     <div className="stu-class-meta">{g.className || ''}</div>
                   </td>
+                  <td style={{ fontSize: 12 }}>{g.assessmentType || '—'}</td>
                   <td>{g.subject || '—'}</td>
                   <td className="ah-tabnum" style={{ fontWeight: 700 }}>{g.score}/{g.maxScore}{pct != null ? ` (${pct}%)` : ''}</td>
                   <td><span className="tag tag-accent">{scoreToBand(g.score, g.maxScore)}</span></td>

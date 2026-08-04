@@ -30,12 +30,16 @@ export default function StudentClasses() {
     if (!studentId || !(enrolled || []).length) return [];
     return enrolled.map((e) => {
       const full = (allClasses || []).find((c) => c.id === e.id || c.id === e.classId);
+      const schedule = Array.isArray(full?.schedule) ? full.schedule : [];
       return {
         id: e.classId || e.id,
         title: e.title || e.className || full?.title || 'صف',
         subject: e.subject || full?.subject || '',
         teacher: e.teacher || e.teacherName || full?.teacher || full?.teacherName || '',
         progress: e.progress,
+        scheduleLabel: schedule.length
+          ? schedule.map((s) => `${s.day} ${s.start || ''}`).join(' · ')
+          : '',
       };
     });
   }, [demo, studentId, enrolled, allClasses]);
@@ -150,7 +154,7 @@ export default function StudentClasses() {
       <ErrorBanner>{(studentErr || classErr) && 'تعذّر تحميل الصفوف.'}</ErrorBanner>
       <header className="stu-page-head">
         <h1 className="stu-page-title">صفوفي ودروسي</h1>
-        <p className="stu-page-lead">افتح الصف للدروس والاختبارات — يمكنك تسليم إجابات الاختبار من هنا.</p>
+        <p className="stu-page-lead">جدول الحصص، الدروس، والاختبارات من صفوفك المسجّلة.</p>
       </header>
       {list.length === 0 && (
         <div className="card stu-empty-card">
@@ -164,6 +168,7 @@ export default function StudentClasses() {
             <span className="tag tag-outline">{c.subject || 'عام'}</span>
             <span className="stu-class-card-title">{c.title}</span>
             <span className="stu-class-meta">{c.teacher || c.nextLesson || ''}</span>
+            {c.scheduleLabel && <span className="stu-class-meta">{c.scheduleLabel}</span>}
             <span className="stu-class-cta"><Icon name="play_arrow" size={15} /> فتح</span>
           </button>
         ))}

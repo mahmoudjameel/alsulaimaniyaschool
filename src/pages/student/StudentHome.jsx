@@ -103,16 +103,16 @@ export default function StudentHome() {
       </section>
 
       {firstClass && (
-        <Link to="/student/classes" className="stu-continue card">
+        <Link to="/student/today" className="stu-continue card">
           <div>
-            <div className="card-kicker">تابع التعلّم</div>
+            <div className="card-kicker">يومك الدراسي</div>
             <div className="stu-continue-title">{firstClass.className || firstClass.title}</div>
             <div className="card-meta" style={{ margin: 0 }}>
-              {[firstClass.subject, firstClass.nextLesson].filter(Boolean).join(' · ') || 'افتح دروس صفك واختباراتك'}
+              جدول الحصص · دفتر اليوم · الواجبات والتنبيهات
             </div>
           </div>
           <span className="btn btn-primary" style={{ pointerEvents: 'none', fontSize: 13, whiteSpace: 'nowrap' }}>
-            <Icon name="play_arrow" size={16} /> صفوفي
+            <Icon name="today" size={16} /> اليوم
           </span>
         </Link>
       )}
@@ -145,7 +145,7 @@ export default function StudentHome() {
             <div key={g.id} className="stu-grade-row">
               <div>
                 <div className="stu-class-name">{g.assessmentTitle || 'تقييم'}</div>
-                <div className="stu-class-meta">{g.subject || ''}</div>
+                <div className="stu-class-meta">{[g.assessmentType, g.subject].filter(Boolean).join(' · ')}</div>
               </div>
               <div className="stu-grade-score ah-tabnum">{g.score}/{g.maxScore}</div>
             </div>
