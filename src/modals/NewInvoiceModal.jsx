@@ -28,7 +28,18 @@ export default function NewInvoiceModal({ students, onClose, demo }) {
     setSubmitting(true);
     setError('');
     try {
-      await createManualCharge({ studentId, studentName: student.name, type, amountShekels: amount, method, receiptFile });
+      await createManualCharge({
+        studentId,
+        studentName: student.name,
+        type,
+        amountShekels: amount,
+        method,
+        receiptFile,
+        stageId: student.stageId || null,
+        stageLabel: student.stageLabel || null,
+        classSection: student.classSection || null,
+        grade: student.grade || null,
+      });
       onClose();
     } catch {
       setError('تعذّر حفظ الفاتورة. حاول مجدداً.');

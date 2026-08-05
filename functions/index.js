@@ -271,6 +271,9 @@ export const acceptAdmission = onCall(async (request) => {
     guardianPhoneE164: admission.phoneE164 || admission.phone || null,
     guardianPhoneWa: admission.phoneWa || null,
     guardianPhoneKey: phoneKey,
+    residentialAddress: admission.residentialAddress || null,
+    guardianWorkStatus: admission.guardianWorkStatus || null,
+    housingType: admission.housingType || null,
     guardianUid,
     grade: admission.grade || admission.stageLabel || 'الأول الأساسي',
     shift: 'صباحي',
@@ -546,6 +549,7 @@ export const generateInvoices = onCall(async (request) => {
       tx.set(chargeRef, {
         studentId: studentDoc.id, student: student.name, period, type: 'رسوم دراسية شهرية',
         stageId: student.stageId || null, stageLabel: student.stageLabel || null,
+        classSection: student.classSection || null, grade: student.grade || null,
         amountMinorUnits: fee, discountMinorUnits: 0, status: 'مسودّة', method: '—',
         createdAt: FieldValue.serverTimestamp(),
       });

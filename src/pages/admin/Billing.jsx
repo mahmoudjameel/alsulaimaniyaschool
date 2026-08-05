@@ -3,33 +3,42 @@ import { Link } from 'react-router-dom';
 import { orderBy } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import BackButton from '../../components/BackButton';
-import SearchInput from '../../components/SearchInput';
+import ChargeInvoiceFilters from '../../components/ChargeInvoiceFilters';
 import { ErrorBanner, EmptyRow } from '../../components/ui';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { useAcademicStages } from '../../hooks/useAcademicStages';
-import { demoBilling } from '../../data/demo';
+import { demoBilling, demoStudents } from '../../data/demo';
 import { generateInvoices } from '../../services/finance';
 import { CURRENT_ACADEMIC_YEAR, formatILS } from '../../lib/constants';
 import { currentPeriod, periodLabel } from '../../lib/staff';
-import { matchesStudentSearch } from '../../lib/studentSearch';
+import {
+  filterAndSortCharges,
+  formatChargeStageLabel,
+  studentsByIdMap,
+} from '../../lib/chargeFilters';
 
 const STATUS_TONE = { 'مؤكَّد': 'accent', 'قيد التأكيد': 'outline', 'مسودّة': 'neutral', 'متأخّر': 'accent2' };
 
 export default function Billing() {
   const { data: charges, error, demo } = useLiveOrDemo('charges', [orderBy('createdAt', 'desc')], demoBilling.charges);
-  const { stages } = useAcademicStages();
+  const { data: students } = useLiveOrDemo('students', [orderBy('name', 'asc')], demoStudents);
+  const { stages, labels: stageLabels } = useAcademicStages();
   const [period, setPeriod] = useState(currentPeriod());
   const [generating, setGenerating] = useState(false);
   const [genMessage, setGenMessage] = useState('');
   const [search, setSearch] = useState('');
+  const [stageFilter, setStageFilter] = useState('الكل');
+  const [sectionFilter, setSectionFilter] = useState('الكل');
+  const [statusFilter, setStatusFilter] = useState('الكل');
+  const [sortId, setSortId] = useState('newest');
+
+  const studentMap = useMemo(() => studentsByIdMap(students), [students]);
 
   const filteredCharges = useMemo(
-    () => (charges || []).filter((c) => matchesStudentSearch(
-      { ...c, name: c.student || c.studentName, studentName: c.student || c.studentName },
-      search,
-      ['type', 'method', 'status'],
-    )),
-    [charges, search],
+    () => filterAndSortCharges(charges, {
+      search, stageFilter, sectionFilter, statusFilter, sortId, students,
+    }),
+    [charges, search, stageFilter, sectionFilter, statusFilter, sortId, students],
   );
 
   const onGenerate = async () => {
@@ -48,6 +57,8 @@ export default function Billing() {
       setGenerating(false);
     }
   };
+
+  const hasFilters = search.trim() || stageFilter !== 'الكل' || sectionFilter !== 'الكل' || statusFilter !== 'الكل';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -93,23 +104,47 @@ export default function Billing() {
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="بحث في الفواتير باسم الطالب…"
-          style={{ maxWidth: 360 }}
+      <div>
+        <h4 style={{ margin: '0 0 10px' }}>سجل الفواتير</h4>
+        <ChargeInvoiceFilters
+          search={search}
+          onSearch={setSearch}
+          stageFilter={stageFilter}
+          onStageFilter={setStageFilter}
+          sectionFilter={sectionFilter}
+          onSectionFilter={setSectionFilter}
+          statusFilter={statusFilter}
+          onStatusFilter={setStatusFilter}
+          sortId={sortId}
+          onSort={setSortId}
+          stageLabels={stageLabels}
+          resultCount={filteredCharges.length}
+          searchPlaceholder="بحث في الفواتير باسم الطالب…"
         />
       </div>
 
       <div className="card ah-table-wrap" style={{ padding: 0 }}>
         <table className="table">
-          <thead><tr><th>الطالب</th><th>نوع الرسم</th><th>المبلغ</th><th>الخصم/المنحة</th><th>الحالة</th><th>طريقة الدفع</th></tr></thead>
+          <thead>
+            <tr>
+              <th>الطالب</th>
+              <th>المرحلة</th>
+              <th>نوع الرسم</th>
+              <th>المبلغ</th>
+              <th>الخصم/المنحة</th>
+              <th>الحالة</th>
+              <th>طريقة الدفع</th>
+            </tr>
+          </thead>
           <tbody>
-            {filteredCharges.length === 0 && <EmptyRow colSpan={6}>{search.trim() ? 'لا فواتير مطابقة.' : 'لا توجد فواتير.'}</EmptyRow>}
+            {filteredCharges.length === 0 && (
+              <EmptyRow colSpan={7}>{hasFilters ? 'لا فواتير مطابقة للفلتر.' : 'لا توجد فواتير.'}</EmptyRow>
+            )}
             {filteredCharges.map((c, i) => (
               <tr key={c.id || i}>
-                <td>{c.student}</td><td>{c.type}</td>
+                <td>{c.student}</td>
+                <td style={{ fontSize: 13 }}>{formatChargeStageLabel(c, studentMap)}</td>
+                <td>{c.type}</td>
                 <td className="ah-tabnum">{c.amount || formatILS(c.amountMinorUnits)}</td>
                 <td className="ah-tabnum" style={{ color: 'var(--color-neutral-500)' }}>{c.discount || (c.discountMinorUnits ? `− ${formatILS(c.discountMinorUnits)}` : '—')}</td>
                 <td><span className={`tag tag-${c.tone || STATUS_TONE[c.status] || 'neutral'}`}>{c.status}</span></td>

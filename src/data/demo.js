@@ -102,12 +102,13 @@ export const demoBilling = {
     { label: 'قائم', value: '₪ 47٬900' },
   ],
   charges: [
-    { student: 'يوسف الأحمد', type: 'رسوم دراسية', amount: '₪ 400', discount: '− ₪ 60', status: 'مؤكَّد', tone: 'accent', method: 'تحويل' },
-    { student: 'مريم الخطيب', type: 'رسوم دراسية', amount: '₪ 400', discount: '—', status: 'مؤكَّد', tone: 'accent', method: 'نقد' },
-    { student: 'عمر ناصر', type: 'رسوم دراسية', amount: '₪ 400', discount: '—', status: 'قيد التأكيد', tone: 'outline', method: 'شيك' },
-    { student: 'زيد الحوراني', type: 'مواصلات', amount: '₪ 80', discount: '—', status: 'مسودّة', tone: 'neutral', method: '—' },
-    { student: 'كرم عبدالله', type: 'رسوم دراسية', amount: '₪ 400', discount: '—', status: 'متأخّر', tone: 'accent2', method: '—' },
-    { student: 'رهف سليمان', type: 'زيّ مدرسي', amount: '₪ 45', discount: '—', status: 'مؤكَّد', tone: 'accent', method: 'نقد' },
+    { student: 'يوسف الأحمد', studentId: 's1', stageLabel: 'الخامس الأساسي', grade: 'الخامس / أ', classSection: 'أ', type: 'رسوم دراسية', amount: '₪ 400', discount: '− ₪ 60', status: 'مؤكَّد', tone: 'accent', method: 'تحويل' },
+    { student: 'مريم الخطيب', studentId: 's2', stageLabel: 'الرابع الأساسي', grade: 'الرابع / ب', classSection: 'ب', type: 'رسوم دراسية', amount: '₪ 400', discount: '—', status: 'مؤكَّد', tone: 'accent', method: 'نقد' },
+    { student: 'عمر ناصر', studentId: 's3', stageLabel: 'السادس الأساسي', grade: 'السادس / أ', classSection: 'أ', type: 'رسوم دراسية', amount: '₪ 400', discount: '—', status: 'قيد التأكيد', tone: 'outline', method: 'شيك' },
+    { student: 'زيد الحوراني', studentId: 's5', stageLabel: 'الأول الأساسي', grade: 'الأول / ج', classSection: 'ج', type: 'مواصلات', amount: '₪ 80', discount: '—', status: 'مسودّة', tone: 'neutral', method: '—' },
+    { student: 'كرم عبدالله', studentId: 's7', stageLabel: 'الثاني الأساسي', grade: 'الثاني / أ', classSection: 'أ', type: 'رسوم دراسية', amount: '₪ 400', discount: '—', status: 'متأخّر', tone: 'accent2', method: '—' },
+    { student: 'رهف سليمان', studentId: 's4', stageLabel: 'الثالث الأساسي', grade: 'الثالث / أ', classSection: 'أ', type: 'زيّ مدرسي', amount: '₪ 45', discount: '—', status: 'مؤكَّد', tone: 'accent', method: 'نقد' },
+    { student: 'ليان مرعي', studentId: 's8', stageLabel: 'الروضة', grade: 'الروضة', classSection: null, type: 'رسوم دراسية', amount: '₪ 350', discount: '—', status: 'مؤكَّد', tone: 'accent', method: 'تحويل' },
   ],
 };
 

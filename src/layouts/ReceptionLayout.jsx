@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 
 const NAV = [
   { to: '/reception', end: true, label: 'لوحتي', icon: 'dashboard', permission: null },
+  { to: '/reception/punch', label: 'تسجيل الحضور', icon: 'fingerprint', permission: null },
   { to: '/reception/admissions', label: 'القبول والتسجيل', icon: 'assignment', permission: 'admissions.manage' },
   { to: '/reception/students', label: 'ملفات الطلاب', icon: 'group', permission: 'students.manage' },
   { to: '/reception/enrollment', label: 'تسجيل في الصفوف', icon: 'person_add', permission: 'enrollment.manage' },
@@ -14,6 +15,7 @@ const NAV = [
 
 const TITLES = {
   '/reception': 'لوحة الاستقبال',
+  '/reception/punch': 'تسجيل الحضور والانصراف',
   '/reception/admissions': 'القبول والتسجيل',
   '/reception/students': 'ملفات الطلاب',
   '/reception/enrollment': 'تسجيل في الصفوف',

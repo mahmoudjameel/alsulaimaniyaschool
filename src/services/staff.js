@@ -45,7 +45,7 @@ export async function updateStaffMember(staffId, payload) {
   const {
     name, roleType, jobTitleAr, salaryType,
     monthlySalaryShekels, hourlyRateShekels, dailyRateShekels, hoursPerMonth,
-    phone, notes, active,
+    phone, notes, active, authUid,
   } = payload;
 
   const monthlySalaryMinorUnits = salaryType === 'monthly' ? shekelsToMinorUnits(monthlySalaryShekels) : null;
@@ -68,6 +68,7 @@ export async function updateStaffMember(staffId, payload) {
     baseMinorUnits,
     phone: (phone || '').trim() || null,
     notes: (notes || '').trim() || null,
+    authUid: authUid || null,
     active: active !== false,
     updatedAt: serverTimestamp(),
   });

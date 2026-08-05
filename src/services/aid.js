@@ -162,6 +162,8 @@ export async function createInstallmentPlan({
   if (postFirst) {
     const first = installmentIds[0];
     await runTransaction(db, async (tx) => {
+      const studentSnap = await tx.get(doc(db, 'students', studentId));
+      const student = studentSnap.exists() ? studentSnap.data() : {};
       tx.set(doc(collection(db, 'charges')), {
         studentId,
         student: studentName,
@@ -172,6 +174,10 @@ export async function createInstallmentPlan({
         method: 'تقسيط',
         planId: planRef.id,
         installmentId: first.id,
+        stageId: student.stageId || null,
+        stageLabel: student.stageLabel || null,
+        classSection: student.classSection || null,
+        grade: student.grade || null,
         createdAt: serverTimestamp(),
       });
       tx.set(doc(collection(db, 'students', studentId, 'ledger')), {
@@ -211,6 +217,9 @@ export async function postInstallmentDue(installmentId, { actor } = {}) {
     const inst = snap.data();
     if (inst.status !== 'مجدول') throw new Error('not scheduled');
 
+    const studentSnap = await tx.get(doc(db, 'students', inst.studentId));
+    const student = studentSnap.exists() ? studentSnap.data() : {};
+
     tx.update(instRef, {
       status: 'مستحق',
       postedAt: serverTimestamp(),
@@ -226,6 +235,10 @@ export async function postInstallmentDue(installmentId, { actor } = {}) {
       method: 'تقسيط',
       planId: inst.planId,
       installmentId,
+      stageId: student.stageId || null,
+      stageLabel: student.stageLabel || null,
+      classSection: student.classSection || null,
+      grade: student.grade || null,
       createdAt: serverTimestamp(),
     });
     tx.set(doc(collection(db, 'students', inst.studentId, 'ledger')), {

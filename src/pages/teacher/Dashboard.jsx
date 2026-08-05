@@ -2,15 +2,18 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { orderBy, where } from 'firebase/firestore';
 import Icon from '../../components/Icon';
+import TeacherPunchCard from '../../components/TeacherPunchCard';
 import { ErrorBanner } from '../../components/ui';
 import { useMyClasses } from '../../hooks/useMyClasses';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { enrolledDisplayCount, useEnrollmentCounts } from '../../hooks/useEnrollmentCounts';
 
 const QUICK = [
+  { to: '/teacher/punch', icon: 'fingerprint', title: 'تسجيل الحضور', body: 'تثبيت الحضور والانصراف من داخل الحرم.' },
   { to: '/teacher/inbox', icon: 'notifications', title: 'إشعاراتي', body: 'درجات معتمدة وتبريرات وتنبيهات الإدارة.' },
   { to: '/teacher/students', icon: 'group', title: 'كل طلابي', body: 'قائمة كاملة لكل الفصول — ملف واحد لكل طالب.' },
-  { to: '/teacher/attendance', icon: 'fact_check', title: 'الحضور والغياب', body: 'نفس أمس أو نموذج الصف لتسريع التسجيل.' },
+  { to: '/teacher/attendance', icon: 'fact_check', title: 'حضور الطلاب', body: 'نفس أمس أو نموذج الصف لتسريع التسجيل.' },
+  { to: '/teacher/continuous-grades', icon: 'draw', title: 'دفتر·حضور·نشاط', body: 'درجات مستمرة للصف — رصد جماعي سريع.' },
   { to: '/teacher/bulk-grades', icon: 'grid_view', title: 'رصد جماعي', body: 'عمود درجات لكل طلاب الصف دفعة واحدة.' },
   { to: '/teacher/exams', icon: 'event', title: 'تقويم اختبارات', body: 'مواعيد تظهر للطالب بعد اعتماد الإدارة.' },
   { to: '/teacher/follow-up', icon: 'warning', title: 'متابعة الطلاب', body: 'غياب متكرر ودرجات منخفضة — واتساب.' },
@@ -43,6 +46,8 @@ export default function TeacherDashboard() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <ErrorBanner>{error && 'تعذّر تحميل صفوفك.'}</ErrorBanner>
+
+      <TeacherPunchCard compact detailsTo="/teacher/punch" />
 
       <div
         className="card"

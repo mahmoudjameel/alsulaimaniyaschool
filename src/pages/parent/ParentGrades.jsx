@@ -7,7 +7,7 @@ import { EmptyRow, ErrorBanner } from '../../components/ui';
 import { useMyChildren } from '../../hooks/useMyChildren';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { CURRENT_ACADEMIC_YEAR } from '../../lib/constants';
-import { scoreToBand } from '../../services/grades';
+import { assessmentTypeLabel, scoreToBand } from '../../services/grades';
 import { demoGradeEntries } from '../../data/demo';
 
 export default function ParentGrades() {
@@ -64,6 +64,7 @@ export default function ParentGrades() {
               <thead>
                 <tr>
                   <th>التقييم</th>
+                  <th>النوع</th>
                   <th>المادة</th>
                   <th>الدرجة</th>
                   <th>التقدير</th>
@@ -71,7 +72,7 @@ export default function ParentGrades() {
                 </tr>
               </thead>
               <tbody>
-                {approved.length === 0 && <EmptyRow colSpan={5}>لا درجات معتمدة بعد.</EmptyRow>}
+                {approved.length === 0 && <EmptyRow colSpan={6}>لا درجات معتمدة بعد.</EmptyRow>}
                 {approved.map((g) => {
                   const pct = g.maxScore ? Math.round((Number(g.score) / Number(g.maxScore)) * 100) : null;
                   return (
@@ -80,6 +81,7 @@ export default function ParentGrades() {
                         <div style={{ fontWeight: 600 }}>{g.assessmentTitle || 'تقييم'}</div>
                         <div className="stu-class-meta">{g.className || ''}</div>
                       </td>
+                      <td style={{ fontSize: 12 }}>{assessmentTypeLabel(g.assessmentType) || '—'}</td>
                       <td>{g.subject || '—'}</td>
                       <td className="ah-tabnum" style={{ fontWeight: 700 }}>
                         {g.score}/{g.maxScore}{pct != null ? ` (${pct}%)` : ''}

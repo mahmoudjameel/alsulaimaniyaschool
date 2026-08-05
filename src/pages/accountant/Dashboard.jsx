@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom';
 import { orderBy, where } from 'firebase/firestore';
 import Icon from '../../components/Icon';
+import TeacherPunchCard from '../../components/TeacherPunchCard';
 import { ErrorBanner } from '../../components/ui';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { demoStudents, demoExpenses } from '../../data/demo';
 import { formatILS } from '../../lib/constants';
 
 const LINKS = [
+  { to: '/accountant/punch', icon: 'fingerprint', title: 'تسجيل الحضور', body: 'تثبيت الحضور والانصراف من داخل الحرم.' },
   { to: '/accountant/invoices', icon: 'upload_file', title: 'فواتير الطلاب', body: 'رفع رسم يدوي مع إيصال.' },
   { to: '/accountant/payments', icon: 'fact_check', title: 'وصول تحويل الأولياء', body: 'اعتماد أو رفض وصل الدفع.' },
   { to: '/accountant/fee-aid', icon: 'sell', title: 'خصم وإعفاء وتقسيط', body: 'منح خصم أو إعفاء أو خطة تقسيط.' },
@@ -46,6 +48,9 @@ export default function AccountantDashboard() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <ErrorBanner>{(sErr || pErr || eErr) && 'تعذّر تحميل بعض إحصاءات اللوحة.'}</ErrorBanner>
+
+      <TeacherPunchCard compact detailsTo="/accountant/punch" />
+
       <div className="card" style={{ borderColor: 'var(--color-accent-300)', background: 'var(--color-accent-100)', padding: '14px 16px', fontSize: 13, color: 'var(--color-accent-900)' }}>
         رسوم الطلاب، الرواتب، السلف، والمصاريف.
       </div>

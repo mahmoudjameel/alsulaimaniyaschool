@@ -8,7 +8,7 @@ import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { useAuth } from '../../context/AuthContext';
 import { useMyClasses } from '../../hooks/useMyClasses';
 import { demoEnrollments, demoStudents } from '../../data/demo';
-import { ASSESSMENT_TYPES, submitGrade } from '../../services/grades';
+import { ASSESSMENT_TYPES, CONTINUOUS_TYPES, defaultMaxForType, submitGrade } from '../../services/grades';
 import { filterByStudentSearch, matchesStudentSearch } from '../../lib/studentSearch';
 import { SCHOOL_NAME_AR } from '../../lib/constants';
 import { TEACHER_GRADE_TEMPLATE } from '../../lib/phone';
@@ -55,12 +55,16 @@ export default function Grades() {
   const [assessmentTitle, setAssessmentTitle] = useState('');
   const [term, setTerm] = useState(TERMS[0]);
   const [score, setScore] = useState('');
-  const [maxScore, setMaxScore] = useState('100');
+  const [maxScore, setMaxScore] = useState(String(defaultMaxForType(ASSESSMENT_TYPES[0])));
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [lastGrade, setLastGrade] = useState(null);
 
   const { data: studentsDir } = useLiveOrDemo('students', [orderBy('name', 'asc')], demoStudents);
+
+  useEffect(() => {
+    setMaxScore(String(defaultMaxForType(assessmentType)));
+  }, [assessmentType]);
 
   const resolvedTitle = (assessmentTitle || '').trim()
     || (assessmentType === 'أخرى' ? '' : assessmentType);
@@ -115,7 +119,9 @@ export default function Grades() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <ErrorBanner>{error && 'تعذّر تحميل الدرجات.'}</ErrorBanner>
       <p style={{ margin: 0, fontSize: 14, color: 'var(--color-neutral-700)', lineHeight: 1.7 }}>
-        رصد درجات الامتحانات والفرض — تُرسل بحالة «قيد المراجعة» حتى تعتمدها الإدارة.
+        رصد درجة لطالب واحد (دفتر / حضور / نشاط / اختبارات). للرصد الجماعي للمستمرة استخدم{' '}
+        <Link to={`/teacher/continuous-grades?class=${activeClassId}`}>درجات دفتر وحضور ونشاط</Link>.
+        تُرسل بحالة «قيد المراجعة» حتى تعتمدها الإدارة.
       </p>
       <div className="ah-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 16, alignItems: 'start' }}>
         <form className="card" onSubmit={onSubmit}>
@@ -147,7 +153,14 @@ export default function Grades() {
             <div className="field">
               <label>نوع التقييم</label>
               <select className="input" value={assessmentType} onChange={(e) => setAssessmentType(e.target.value)}>
-                {ASSESSMENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                <optgroup label="درجات مستمرة">
+                  {CONTINUOUS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </optgroup>
+                <optgroup label="اختبارات وفرض">
+                  {ASSESSMENT_TYPES.filter((t) => !CONTINUOUS_TYPES.includes(t)).map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </optgroup>
               </select>
             </div>
             <div className="field">

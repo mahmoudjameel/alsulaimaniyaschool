@@ -3,7 +3,8 @@ import Modal from '../components/Modal';
 import { Field } from '../components/ui';
 import PhoneWhatsAppField from '../components/PhoneWhatsAppField';
 import {
-  composeFullName, CURRENT_ACADEMIC_YEAR, SECTION_OPTIONS,
+  composeFullName, CURRENT_ACADEMIC_YEAR, GUARDIAN_WORK_STATUS_OPTIONS,
+  HOUSING_TYPE_OPTIONS, SECTION_OPTIONS,
 } from '../lib/constants';
 import { isValidLocalMobile, normalizeLocalMobile, phoneKeyFromLocal, toE164Display, toWhatsAppNumber } from '../lib/phone';
 import { useAcademicStages } from '../hooks/useAcademicStages';
@@ -22,6 +23,9 @@ export default function NewStudentModal({ onClose, demo }) {
   const [guardianName, setGuardianName] = useState('');
   const [phoneDial, setPhoneDial] = useState('970');
   const [phoneLocal, setPhoneLocal] = useState('');
+  const [residentialAddress, setResidentialAddress] = useState('');
+  const [guardianWorkStatus, setGuardianWorkStatus] = useState(GUARDIAN_WORK_STATUS_OPTIONS[0]);
+  const [housingType, setHousingType] = useState(HOUSING_TYPE_OPTIONS[0]);
   const [stageId, setStageId] = useState('');
   const [classSection, setClassSection] = useState(SECTION_OPTIONS[0]);
   const [ageYears, setAgeYears] = useState('');
@@ -43,6 +47,7 @@ export default function NewStudentModal({ onClose, demo }) {
     if (!fullName) { setError('أدخل الاسم الرباعي.'); return; }
     if (!nationalId.trim()) { setError('رقم الهوية مطلوب.'); return; }
     if (!isValidLocalMobile(phoneLocal)) { setError('أدخل رقم واتساب ولي الأمر بمقدمة +970 أو +972.'); return; }
+    if (!residentialAddress.trim()) { setError('عنوان السكن مطلوب.'); return; }
     if (demo) { setError('وضع العرض التوضيحي: صِل مشروع Firebase (راجع .env.local) لحفظ الطلاب فعلياً.'); return; }
     setSubmitting(true);
     setError('');
@@ -58,6 +63,9 @@ export default function NewStudentModal({ onClose, demo }) {
         guardianPhoneE164: phoneE164,
         guardianPhoneWa: phoneWa,
         guardianPhoneKey: phoneKeyFromLocal(phoneLocal),
+        residentialAddress,
+        guardianWorkStatus,
+        housingType,
         stageId: selectedStage?.id, stageLabel, classSection,
         ageYears, academicYear, shift,
       });
@@ -75,7 +83,7 @@ export default function NewStudentModal({ onClose, demo }) {
 
   return (
     <Modal title="تسجيل طالب جديد" onClose={onClose} onSubmit={onSubmit} submitLabel="حفظ الطالب" submitting={submitting} error={error} width={560}>
-      <div className="dialog-body">الاسم الرباعي، رقم الهوية، وواتساب ولي الأمر (+970 أو +972).</div>
+      <div className="dialog-body">الاسم الرباعي، رقم الهوية، وبيانات ولي الأمر (واتساب، عنوان السكن، العمل، نوع السكن).</div>
       <div className="site-grid-2">
         <Field label="الاسم الأول"><input className="input" value={nameFirst} onChange={(e) => setNameFirst(e.target.value)} required /></Field>
         <Field label="اسم الأب"><input className="input" value={nameFather} onChange={(e) => setNameFather(e.target.value)} required /></Field>
@@ -92,6 +100,27 @@ export default function NewStudentModal({ onClose, demo }) {
       </div>
       <Field label="ولي الأمر"><input className="input" value={guardianName} onChange={(e) => setGuardianName(e.target.value)} required /></Field>
       <PhoneWhatsAppField dialCode={phoneDial} localPhone={phoneLocal} onDialChange={setPhoneDial} onLocalChange={setPhoneLocal} />
+      <Field label="عنوان السكن">
+        <input
+          className="input"
+          value={residentialAddress}
+          onChange={(e) => setResidentialAddress(e.target.value)}
+          required
+          placeholder="المدينة / الحي / الشارع…"
+        />
+      </Field>
+      <div className="site-grid-2">
+        <Field label="حالة العمل">
+          <select className="input" value={guardianWorkStatus} onChange={(e) => setGuardianWorkStatus(e.target.value)} required>
+            {GUARDIAN_WORK_STATUS_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+          </select>
+        </Field>
+        <Field label="نوع السكن">
+          <select className="input" value={housingType} onChange={(e) => setHousingType(e.target.value)} required>
+            {HOUSING_TYPE_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+          </select>
+        </Field>
+      </div>
       <div className="site-grid-3f">
         <Field label="المرحلة الدراسية">
           <select className="input" value={stageId} onChange={(e) => setStageId(e.target.value)} required>

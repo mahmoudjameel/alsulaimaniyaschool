@@ -32,6 +32,12 @@ export const GRADE_OPTIONS = [
 /** Section letters within a stage (الصف / الشعبة). */
 export const SECTION_OPTIONS = ['أ', 'ب', 'ج', 'د'];
 
+/** ولي الأمر — حالة العمل عند التسجيل */
+export const GUARDIAN_WORK_STATUS_OPTIONS = ['يعمل', 'لا يعمل'];
+
+/** ولي الأمر — نوع السكن */
+export const HOUSING_TYPE_OPTIONS = ['ملك', 'إيجار', 'مع الأهل', 'أخرى'];
+
 export const CURRENT_ACADEMIC_YEAR = '2026 / 2027';
 
 /** Compose a four-part Arabic full name; blanks are skipped. */

@@ -5,7 +5,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 
 const db = () => getFirestore();
 const auth = () => getAuth();
-const bucket = () => bucket();
+const storageBucket = () => getStorage().bucket();
 
 /** Top-level collections + known subcollections for full school OS backup. */
 export const BACKUP_SCHEMA = {
@@ -34,6 +34,12 @@ export const BACKUP_SCHEMA = {
   announcements: [],
   comments: [],
   registrations: [],
+  schoolSettings: [],
+  staffAttendanceDays: [],
+  notifications: [],
+  staffRequests: [],
+  classExams: [],
+  homeworkSubmissions: [],
 };
 
 const WIPE_CONFIRM = 'مسح-كل-البيانات';
@@ -226,9 +232,9 @@ export const exportSystemBackup = onCall(
 
     // Prefer Storage for large payloads (callable response limit).
     if (bytes > 4.5 * 1024 * 1024) {
-      const bucket = bucket();
+      const bkt = storageBucket();
       const path = `system-backups/${uid}/${fileName}`;
-      const file = bucket.file(path);
+      const file = bkt.file(path);
       await file.save(json, { contentType: 'application/json', resumable: false });
       const [downloadUrl] = await file.getSignedUrl({
         action: 'read',
@@ -291,7 +297,7 @@ export const importSystemBackup = onCall(
       if (!String(storagePath).startsWith(`system-backups/${uid}/`)) {
         throw new HttpsError('permission-denied', 'مسار النسخة غير مسموح.');
       }
-      const [buf] = await bucket().file(storagePath).download();
+      const [buf] = await storageBucket().file(storagePath).download();
       backup = JSON.parse(buf.toString('utf8'));
     }
     if (!backup || backup.kind !== 'alsulaimaniya-system-backup') {

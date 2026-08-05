@@ -15,6 +15,8 @@ import Billing from './pages/admin/Billing';
 import PaymentProofs from './pages/PaymentProofs';
 import Payroll from './pages/admin/Payroll';
 import Staff from './pages/admin/Staff';
+import StaffAttendance from './pages/admin/StaffAttendance';
+import SchoolSite from './pages/admin/SchoolSite';
 import Disbursements from './pages/Disbursements';
 import Expenses from './pages/admin/Expenses';
 import FeeAid from './pages/FeeAid';
@@ -33,6 +35,7 @@ import ActivityLog from './pages/admin/ActivityLog';
 
 import TeacherLayout from './layouts/TeacherLayout';
 import TeacherDashboard from './pages/teacher/Dashboard';
+import TeacherPunch from './pages/teacher/TeacherPunch';
 import TeacherClasses from './pages/teacher/TeacherClasses';
 import TeacherClassDetail from './pages/teacher/TeacherClassDetail';
 import TeacherSchedule from './pages/teacher/TeacherSchedule';
@@ -51,6 +54,7 @@ import TeacherStudentReport from './pages/teacher/TeacherStudentReport';
 import TeacherInbox from './pages/teacher/TeacherInbox';
 import TeacherRequests from './pages/teacher/TeacherRequests';
 import TeacherBulkGrades from './pages/teacher/TeacherBulkGrades';
+import TeacherContinuousGrades from './pages/teacher/TeacherContinuousGrades';
 import TeacherExams from './pages/teacher/TeacherExams';
 import TeacherProfilePage from './pages/teacher/TeacherProfilePage';
 import AdminClassGradeSheet from './pages/admin/ClassGradeSheet';
@@ -60,6 +64,7 @@ import ReportCard from './pages/ReportCard';
 import AccountantLayout from './layouts/AccountantLayout';
 import AccountantDashboard from './pages/accountant/Dashboard';
 import AccountantInvoices from './pages/accountant/Invoices';
+import AccountantPunch from './pages/accountant/AccountantPunch';
 import Enrollment from './pages/accountant/Enrollment';
 
 import ParentLayout from './layouts/ParentLayout';
@@ -77,6 +82,7 @@ import ParentExams from './pages/parent/ParentExams';
 
 import ReceptionLayout from './layouts/ReceptionLayout';
 import ReceptionDashboard from './pages/reception/ReceptionDashboard';
+import ReceptionPunch from './pages/reception/ReceptionPunch';
 
 import StudentLayout from './layouts/StudentLayout';
 import StudentHome from './pages/student/StudentHome';
@@ -123,6 +129,8 @@ export default function App() {
             <Route path="absence-excuses" element={<AbsenceExcuses />} />
             <Route path="payroll" element={<Payroll />} />
             <Route path="staff" element={<Staff />} />
+            <Route path="staff-attendance" element={<StaffAttendance />} />
+            <Route path="school-site" element={<SchoolSite />} />
             <Route path="disbursements" element={<Disbursements />} />
             <Route path="expenses" element={<Expenses />} />
             <Route path="classes" element={<Classes />} />
@@ -142,6 +150,7 @@ export default function App() {
 
           <Route path="/teacher" element={<RequireRole role="teacher"><TeacherLayout /></RequireRole>}>
             <Route index element={<TeacherDashboard />} />
+            <Route path="punch" element={<TeacherPunch />} />
             <Route path="schedule" element={<TeacherSchedule />} />
             <Route path="classes" element={<TeacherClasses />} />
             <Route path="classes/:id" element={<TeacherClassDetail />} />
@@ -151,6 +160,7 @@ export default function App() {
             <Route path="inbox" element={<TeacherInbox />} />
             <Route path="requests" element={<TeacherRequests />} />
             <Route path="bulk-grades" element={<TeacherBulkGrades />} />
+            <Route path="continuous-grades" element={<TeacherContinuousGrades />} />
             <Route path="exams" element={<TeacherExams />} />
             <Route path="profile" element={<TeacherProfilePage />} />
             <Route path="builder" element={<Builder />} />
@@ -166,6 +176,7 @@ export default function App() {
 
           <Route path="/accountant" element={<RequireRole role="accountant"><AccountantLayout /></RequireRole>}>
             <Route index element={<AccountantDashboard />} />
+            <Route path="punch" element={<AccountantPunch />} />
             <Route path="invoices" element={<AccountantInvoices />} />
             <Route path="payments" element={<PaymentProofs />} />
             <Route path="fee-aid" element={<FeeAid />} />
@@ -180,6 +191,7 @@ export default function App() {
 
           <Route path="/reception" element={<RequireRole role="reception"><ReceptionLayout /></RequireRole>}>
             <Route index element={<ReceptionDashboard />} />
+            <Route path="punch" element={<ReceptionPunch />} />
             <Route path="admissions" element={<Admissions />} />
             <Route path="students" element={<Students />} />
             <Route path="students/:id" element={<StudentProfile />} />

@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 
 const NAV = [
   { to: '/accountant', end: true, label: 'لوحتي', icon: 'dashboard', permission: null },
+  { to: '/accountant/punch', label: 'تسجيل الحضور', icon: 'fingerprint', permission: null },
   { to: '/accountant/invoices', label: 'فواتير الطلاب', icon: 'receipt_long', permission: 'billing.manage' },
   { to: '/accountant/payments', label: 'وصول الدفع', icon: 'fact_check', permission: 'payments.manage' },
   { to: '/accountant/fee-aid', label: 'خصم وإعفاء وتقسيط', icon: 'sell', permission: 'billing.manage' },
@@ -20,6 +21,7 @@ const NAV = [
 
 const TITLES = {
   '/accountant': 'لوحة المحاسب',
+  '/accountant/punch': 'تسجيل الحضور والانصراف',
   '/accountant/invoices': 'فواتير الطلاب',
   '/accountant/payments': 'وصول الدفع',
   '/accountant/fee-aid': 'خصم وإعفاء وتقسيط',

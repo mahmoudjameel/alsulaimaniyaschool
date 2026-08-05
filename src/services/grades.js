@@ -14,9 +14,41 @@ export function scoreToBand(score, maxScore) {
   return 'ضعيف';
 }
 
+/** Continuous classroom marks (دفتر / حضور / نشاط) + exam types. */
+export const CONTINUOUS_TYPES = ['دفتر', 'حضور', 'نشاط'];
+
+export const EXAM_TYPES = ['اختبار شهري', 'نصف فصل', 'نهاية فصل', 'فرض صفّي'];
+
 /** Teacher submits a grade for one student — always lands as "قيد المراجعة"
- * (enforced by firestore.rules too) until an admin approves it. */
-export const ASSESSMENT_TYPES = ['اختبار شهري', 'نصف فصل', 'نهاية فصل', 'فرض صفّي', 'أخرى'];
+ * until an admin approves it. */
+export const ASSESSMENT_TYPES = [...CONTINUOUS_TYPES, ...EXAM_TYPES, 'أخرى'];
+
+/** Suggested max score by type (teacher can still change). */
+export const DEFAULT_MAX_BY_TYPE = {
+  دفتر: 10,
+  حضور: 10,
+  نشاط: 10,
+  'فرض صفّي': 20,
+  'اختبار شهري': 100,
+  'نصف فصل': 100,
+  'نهاية فصل': 100,
+  أخرى: 100,
+};
+
+export function defaultMaxForType(type) {
+  return DEFAULT_MAX_BY_TYPE[type] ?? 100;
+}
+
+export function isContinuousType(type) {
+  return CONTINUOUS_TYPES.includes(type);
+}
+
+export function assessmentTypeLabel(type) {
+  if (type === 'دفتر') return 'درجة الدفتر';
+  if (type === 'حضور') return 'درجة الحضور';
+  if (type === 'نشاط') return 'درجة النشاط';
+  return type || 'تقييم';
+}
 
 export async function submitGrade({
   classId, className, subject, studentId, studentName, teacherId, teacherName,
@@ -40,8 +72,6 @@ export async function submitGrade({
   return ref.id;
 }
 
-/** Admin (or a delegated "grades.approve" permission) approves a pending
- * grade — this is the moment it becomes visible on the student's record. */
 export async function approveGrade(entry, decidedBy) {
   await updateDoc(doc(db, 'gradeEntries', entry.id), {
     status: 'معتمد', decidedAt: serverTimestamp(), decidedBy: decidedBy.uid,

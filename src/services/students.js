@@ -19,6 +19,7 @@ export async function createStudent(payload = {}) {
     name: nameOverride, guardianName, guardianPhone,
     guardianPhoneDial, guardianPhoneLocal, guardianPhoneE164, guardianPhoneWa,
     guardianPhoneKey,
+    residentialAddress, guardianWorkStatus, housingType,
     nationalId, academicYear, stageId, stageLabel, classSection,
     ageYears, grade, shift,
   } = payload;
@@ -55,6 +56,9 @@ export async function createStudent(payload = {}) {
     guardianPhoneE164: guardianPhoneE164 || guardianPhone || null,
     guardianPhoneWa: guardianPhoneWa || null,
     guardianPhoneKey: phoneKey,
+    residentialAddress: (residentialAddress || '').trim() || null,
+    guardianWorkStatus: (guardianWorkStatus || '').trim() || null,
+    housingType: (housingType || '').trim() || null,
     // Portal UIDs are linked on first parent/student login (or admissions accept)
     studentUid: null,
     guardianUid: null,
@@ -72,6 +76,9 @@ export async function createStudent(payload = {}) {
     phone: guardianPhoneE164 || guardianPhone || null,
     phoneLocal,
     phoneKey,
+    residentialAddress: (residentialAddress || '').trim() || null,
+    workStatus: (guardianWorkStatus || '').trim() || null,
+    housingType: (housingType || '').trim() || null,
     relation: 'ولي أمر',
     primary: true,
     createdAt: serverTimestamp(),
@@ -83,26 +90,54 @@ export async function createStudent(payload = {}) {
 export async function updateStudent(studentId, patch) {
   await updateDoc(doc(db, 'students', studentId), patch);
 
-  // Keep primary guardian mirror in sync when contact fields change
-  const touchesGuardian = ['guardianName', 'guardianPhone', 'guardianPhoneE164', 'guardianPhoneLocal', 'guardianPhoneKey']
-    .some((k) => Object.prototype.hasOwnProperty.call(patch, k));
+  // Keep primary guardian mirror in sync when contact / household fields change
+  const touchesGuardian = [
+    'guardianName', 'guardianPhone', 'guardianPhoneE164', 'guardianPhoneLocal', 'guardianPhoneKey',
+    'residentialAddress', 'guardianWorkStatus', 'housingType',
+  ].some((k) => Object.prototype.hasOwnProperty.call(patch, k));
   if (touchesGuardian) {
     const gSnap = await getDocs(collection(db, 'students', studentId, 'guardians'));
     const primary = gSnap.docs.find((d) => d.data().primary) || gSnap.docs[0];
     const guardianPatch = {
-      name: patch.guardianName || '—',
-      phone: patch.guardianPhoneE164 || patch.guardianPhone || null,
-      phoneLocal: patch.guardianPhoneLocal || null,
-      phoneKey: patch.guardianPhoneKey || null,
       relation: 'ولي أمر',
       primary: true,
       updatedAt: serverTimestamp(),
     };
+    if (Object.prototype.hasOwnProperty.call(patch, 'guardianName')) {
+      guardianPatch.name = patch.guardianName || '—';
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'guardianPhoneE164')
+      || Object.prototype.hasOwnProperty.call(patch, 'guardianPhone')) {
+      guardianPatch.phone = patch.guardianPhoneE164 || patch.guardianPhone || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'guardianPhoneLocal')) {
+      guardianPatch.phoneLocal = patch.guardianPhoneLocal || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'guardianPhoneKey')) {
+      guardianPatch.phoneKey = patch.guardianPhoneKey || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'residentialAddress')) {
+      guardianPatch.residentialAddress = patch.residentialAddress || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'guardianWorkStatus')) {
+      guardianPatch.workStatus = patch.guardianWorkStatus || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'housingType')) {
+      guardianPatch.housingType = patch.housingType || null;
+    }
     if (primary) {
       await updateDoc(primary.ref, guardianPatch);
     } else {
       await addDoc(collection(db, 'students', studentId, 'guardians'), {
-        ...guardianPatch,
+        name: guardianPatch.name || '—',
+        phone: guardianPatch.phone || null,
+        phoneLocal: guardianPatch.phoneLocal || null,
+        phoneKey: guardianPatch.phoneKey || null,
+        residentialAddress: guardianPatch.residentialAddress || null,
+        workStatus: guardianPatch.workStatus || null,
+        housingType: guardianPatch.housingType || null,
+        relation: 'ولي أمر',
+        primary: true,
         createdAt: serverTimestamp(),
       });
     }
@@ -143,6 +178,9 @@ export function parseStudentsCsv(text) {
       name: legacyName || undefined,
       guardianName: get('guardianname', 'ولي الأمر'),
       guardianPhone: get('guardianphone', 'هاتف ولي الأمر'),
+      residentialAddress: get('residentialaddress', 'عنوان السكن', 'العنوان'),
+      guardianWorkStatus: get('guardianworkstatus', 'حالة العمل', 'العمل'),
+      housingType: get('housingtype', 'نوع السكن'),
       nationalId: get('nationalid', 'رقم الهوية'),
       grade: get('grade', 'الصف', 'المرحلة'),
       stageLabel: get('stage', 'المرحلة'),

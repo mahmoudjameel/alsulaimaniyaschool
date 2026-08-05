@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom';
 import { orderBy, where } from 'firebase/firestore';
 import Icon from '../../components/Icon';
+import TeacherPunchCard from '../../components/TeacherPunchCard';
 import { ErrorBanner } from '../../components/ui';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { demoAdmissions, demoStudents } from '../../data/demo';
 
 const LINKS = [
+  { to: '/reception/punch', icon: 'fingerprint', title: 'تسجيل الحضور', body: 'تثبيت الحضور والانصراف من داخل الحرم.' },
   { to: '/reception/admissions', icon: 'assignment', title: 'القبول والتسجيل', body: 'مراجعة طلبات الموقع وقبولها أو رفضها.' },
   { to: '/reception/students', icon: 'group', title: 'ملفات الطلاب', body: 'إنشاء طالب جديد أو فتح ملف موجود.' },
   { to: '/reception/enrollment', icon: 'person_add', title: 'تسجيل في الصفوف', body: 'إضافة الطالب المقبول إلى صف دراسي.' },
@@ -37,6 +39,9 @@ export default function ReceptionDashboard() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <ErrorBanner>{(aErr || sErr) && 'تعذّر تحميل بعض الإحصاءات.'}</ErrorBanner>
+
+      <TeacherPunchCard compact detailsTo="/reception/punch" />
+
       <div className="card" style={{ borderColor: 'var(--color-accent-300)', background: 'var(--color-accent-100)', padding: '14px 16px', fontSize: 13, color: 'var(--color-accent-900)' }}>
         طلبات التسجيل، ملفات الطلاب، والتسجيل في الصفوف.
       </div>

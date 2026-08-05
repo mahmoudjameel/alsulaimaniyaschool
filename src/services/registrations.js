@@ -10,6 +10,7 @@ import { admissionsCol } from './admissions';
 export async function submitRegistration(form) {
   const {
     guardianName, phone, phoneDial, phoneLocal, phoneE164, phoneWa,
+    residentialAddress, guardianWorkStatus, housingType,
     nameFirst, nameFather, nameGrandfather, nameFamily,
     studentName, nationalId, stageId, stageLabel, classSection, ageYears,
     academicYear, contactMethod, notes,
@@ -33,6 +34,9 @@ export async function submitRegistration(form) {
     phoneLocal: phoneLocal || null,
     phoneE164: phoneE164 || phone || null,
     phoneWa: phoneWa || null,
+    residentialAddress: (residentialAddress || '').trim() || null,
+    guardianWorkStatus: (guardianWorkStatus || '').trim() || null,
+    housingType: (housingType || '').trim() || null,
     stageId: stageId || null,
     stageLabel: stage,
     classSection: classSection || null,

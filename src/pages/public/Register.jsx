@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import PhoneWhatsAppField from '../../components/PhoneWhatsAppField';
 import {
-  CURRENT_ACADEMIC_YEAR, SECTION_OPTIONS,
+  CURRENT_ACADEMIC_YEAR, GUARDIAN_WORK_STATUS_OPTIONS, HOUSING_TYPE_OPTIONS, SECTION_OPTIONS,
 } from '../../lib/constants';
 import { isValidLocalMobile, normalizeLocalMobile, toE164Display, toWhatsAppNumber } from '../../lib/phone';
 import { useAcademicStages } from '../../hooks/useAcademicStages';
@@ -13,6 +13,7 @@ const CONTACT_METHODS = ['واتساب', 'اتصال هاتفي', 'بريد إل
 
 const emptyForm = (stageId = '', stageLabel = '') => ({
   guardianName: '', phoneDial: '970', phoneLocal: '',
+  residentialAddress: '', guardianWorkStatus: GUARDIAN_WORK_STATUS_OPTIONS[0], housingType: HOUSING_TYPE_OPTIONS[0],
   nameFirst: '', nameFather: '', nameGrandfather: '', nameFamily: '',
   nationalId: '', ageYears: '',
   stageId, stageLabel, classSection: SECTION_OPTIONS[0],
@@ -52,6 +53,10 @@ export default function Register() {
     if (!form.nationalId.trim()) { setError('رقم الهوية مطلوب.'); return; }
     if (!isValidLocalMobile(form.phoneLocal)) {
       setError('أدخل رقم واتساب صحيح مثل 0592799888 واختر المقدمة +970 أو +972.');
+      return;
+    }
+    if (!form.residentialAddress.trim()) {
+      setError('عنوان السكن مطلوب.');
       return;
     }
     const phoneE164 = toE164Display(form.phoneDial, form.phoneLocal);
@@ -102,6 +107,30 @@ export default function Register() {
                 onLocalChange={(v) => setForm((f) => ({ ...f, phoneLocal: v }))}
                 required
               />
+              <div className="field">
+                <label>عنوان السكن</label>
+                <input
+                  className="input"
+                  value={form.residentialAddress}
+                  onChange={set('residentialAddress')}
+                  required
+                  placeholder="المدينة / الحي / الشارع…"
+                />
+              </div>
+              <div className="site-grid-2">
+                <div className="field">
+                  <label>حالة العمل</label>
+                  <select className="input" value={form.guardianWorkStatus} onChange={set('guardianWorkStatus')} required>
+                    {GUARDIAN_WORK_STATUS_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>نوع السكن</label>
+                  <select className="input" value={form.housingType} onChange={set('housingType')} required>
+                    {HOUSING_TYPE_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+                  </select>
+                </div>
+              </div>
               <div style={{ fontSize: 13, fontWeight: 600, marginTop: 4 }}>بيانات الطالب — الاسم الرباعي</div>
               <div className="site-grid-2">
                 <div className="field"><label>الاسم الأول</label><input className="input" value={form.nameFirst} onChange={set('nameFirst')} required /></div>

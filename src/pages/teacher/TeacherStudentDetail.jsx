@@ -51,6 +51,12 @@ const ACTIONS = (studentId, classId) => [
     body: 'ملخص شهري للطباعة.',
   },
   {
+    to: `/teacher/continuous-grades?class=${classId || ''}`,
+    icon: 'draw',
+    title: 'دفتر · حضور · نشاط',
+    body: 'درجات مستمرة للصف دفعة واحدة.',
+  },
+  {
     to: `/teacher/grades?class=${classId || ''}`,
     icon: 'grade',
     title: 'رصد درجة',

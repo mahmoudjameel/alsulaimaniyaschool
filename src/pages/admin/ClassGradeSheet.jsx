@@ -100,7 +100,16 @@ export default function ClassGradeSheet() {
           <label>نوع التقييم</label>
           <select className="input" value={assessmentType} onChange={(e) => setAssessmentType(e.target.value)}>
             <option value="">الكل</option>
-            {ASSESSMENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            <optgroup label="مستمرة">
+              <option value="دفتر">دفتر</option>
+              <option value="حضور">حضور</option>
+              <option value="نشاط">نشاط</option>
+            </optgroup>
+            <optgroup label="اختبارات">
+              {ASSESSMENT_TYPES.filter((t) => !['دفتر', 'حضور', 'نشاط'].includes(t)).map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </optgroup>
           </select>
         </div>
         <div className="field" style={{ minWidth: 140 }}>

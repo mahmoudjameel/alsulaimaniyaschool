@@ -29,7 +29,10 @@ export async function confirmCharge(chargeId) {
  * one atomic transaction — same accounting discipline as the server-side
  * invoice generator, just triggered manually for a single student.
  */
-export async function createManualCharge({ studentId, studentName, type, amountShekels, method, receiptFile }) {
+export async function createManualCharge({
+  studentId, studentName, type, amountShekels, method, receiptFile,
+  stageId, stageLabel, classSection, grade,
+}) {
   const amountMinorUnits = shekelsToMinorUnits(amountShekels);
   const today = new Date().toISOString().slice(0, 10);
 
@@ -44,8 +47,19 @@ export async function createManualCharge({ studentId, studentName, type, amountS
   await runTransaction(db, async (tx) => {
     const chargeRef = doc(collection(db, 'charges'));
     tx.set(chargeRef, {
-      studentId, student: studentName, type, amountMinorUnits, discountMinorUnits: 0,
-      status: 'مؤكَّد', method: method || 'يدوي', receiptUrl, createdAt: serverTimestamp(),
+      studentId,
+      student: studentName,
+      type,
+      amountMinorUnits,
+      discountMinorUnits: 0,
+      status: 'مؤكَّد',
+      method: method || 'يدوي',
+      receiptUrl,
+      stageId: stageId || null,
+      stageLabel: stageLabel || null,
+      classSection: classSection || null,
+      grade: grade || null,
+      createdAt: serverTimestamp(),
     });
     tx.set(doc(collection(db, 'students', studentId, 'ledger')), {
       date: today, item: type, debitMinorUnits: amountMinorUnits, creditMinorUnits: 0, createdAt: serverTimestamp(),

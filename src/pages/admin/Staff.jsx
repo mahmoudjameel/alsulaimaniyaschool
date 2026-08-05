@@ -32,6 +32,7 @@ function StaffFormModal({ initial, demo, onClose, onSaved }) {
   const [hours, setHours] = useState(n?.hoursPerMonth != null ? String(n.hoursPerMonth) : '160');
   const [phone, setPhone] = useState(n?.phone || '');
   const [notes, setNotes] = useState(n?.notes || '');
+  const [authUid, setAuthUid] = useState(n?.authUid || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -44,6 +45,7 @@ function StaffFormModal({ initial, demo, onClose, onSaved }) {
       name, roleType, jobTitleAr, salaryType,
       monthlySalaryShekels: monthly, hourlyRateShekels: hourly, dailyRateShekels: daily,
       hoursPerMonth: hours, phone, notes, active: true,
+      authUid: authUid.trim() || null,
     };
     try {
       if (initial?.id) {
@@ -106,6 +108,16 @@ function StaffFormModal({ initial, demo, onClose, onSaved }) {
         <Field label="الهاتف"><input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" style={{ textAlign: 'right' }} /></Field>
         <Field label="ملاحظات"><input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
       </div>
+      <Field label="ربط حساب الدخول (UID) — لسجلّ الحضور والرواتب">
+        <input
+          className="input"
+          value={authUid}
+          onChange={(e) => setAuthUid(e.target.value)}
+          dir="ltr"
+          style={{ textAlign: 'right' }}
+          placeholder="معرّف المستخدم من شاشة المستخدمين"
+        />
+      </Field>
     </Modal>
   );
 }

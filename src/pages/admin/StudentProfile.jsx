@@ -189,6 +189,18 @@ export default function StudentProfile() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13 }}>{student.guardianName || 'ولي أمر'} <span className="tag tag-accent" style={{ fontSize: 9 }}>جهة الاتصال الأساسية</span></div>
                   <div style={{ fontSize: 11, color: 'var(--color-neutral-500)' }} dir="ltr">{student.guardianPhoneE164 || student.guardianPhone || '—'}</div>
+                  {(student.residentialAddress || student.guardianWorkStatus || student.housingType) && (
+                    <div style={{ fontSize: 11, color: 'var(--color-neutral-500)', marginTop: 4, lineHeight: 1.5 }}>
+                      {student.residentialAddress && <div>العنوان: {student.residentialAddress}</div>}
+                      {(student.guardianWorkStatus || student.housingType) && (
+                        <div>
+                          {[student.guardianWorkStatus && `العمل: ${student.guardianWorkStatus}`, student.housingType && `السكن: ${student.housingType}`]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div style={{ fontSize: 11, color: 'var(--color-neutral-500)', marginTop: 2 }}>
                     {student.guardianUid ? 'حساب البوابة مربوط' : 'سيربط عند أول دخول برقم الهاتف'}
                   </div>
@@ -209,6 +221,19 @@ export default function StudentProfile() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13 }}>{g.name} {g.primary && <span className="tag tag-accent" style={{ fontSize: 9 }}>جهة الاتصال الأساسية</span>}</div>
                   <div style={{ fontSize: 11, color: 'var(--color-neutral-500)' }}>{g.relation} · {g.phone}</div>
+                  {(g.residentialAddress || student.residentialAddress || g.workStatus || student.guardianWorkStatus || g.housingType || student.housingType) && (
+                    <div style={{ fontSize: 11, color: 'var(--color-neutral-500)', marginTop: 4, lineHeight: 1.5 }}>
+                      {(g.residentialAddress || student.residentialAddress) && (
+                        <div>العنوان: {g.residentialAddress || student.residentialAddress}</div>
+                      )}
+                      <div>
+                        {[
+                          (g.workStatus || student.guardianWorkStatus) && `العمل: ${g.workStatus || student.guardianWorkStatus}`,
+                          (g.housingType || student.housingType) && `السكن: ${g.housingType || student.housingType}`,
+                        ].filter(Boolean).join(' · ')}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"

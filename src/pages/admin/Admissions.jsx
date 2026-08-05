@@ -77,9 +77,21 @@ export default function Admissions() {
       </div>
       <div className="card ah-table-wrap" style={{ padding: 0 }}>
         <table className="table">
-          <thead><tr><th>مقدّم الطلب</th><th>ولي الأمر</th><th>الهوية</th><th>الصف</th><th>الهاتف</th><th>المصدر</th><th>التاريخ</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>مقدّم الطلب</th>
+              <th>ولي الأمر</th>
+              <th>السكن</th>
+              <th>الهوية</th>
+              <th>الصف</th>
+              <th>الهاتف</th>
+              <th>المصدر</th>
+              <th>التاريخ</th>
+              <th></th>
+            </tr>
+          </thead>
           <tbody>
-            {view.length === 0 && <EmptyRow colSpan={8}>لا توجد طلبات في هذه الفئة حالياً.</EmptyRow>}
+            {view.length === 0 && <EmptyRow colSpan={9}>لا توجد طلبات في هذه الفئة حالياً.</EmptyRow>}
             {view.map((r) => (
               <tr key={r.id}>
                 <td>
@@ -88,7 +100,17 @@ export default function Admissions() {
                     {r.name}
                   </div>
                 </td>
-                <td>{r.guardian}</td>
+                <td>
+                  <div>{r.guardian}</div>
+                  {(r.guardianWorkStatus || r.housingType) && (
+                    <div style={{ fontSize: 11, color: 'var(--color-neutral-500)', marginTop: 2 }}>
+                      {[r.guardianWorkStatus, r.housingType].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
+                </td>
+                <td style={{ fontSize: 12, maxWidth: 160 }}>
+                  {r.residentialAddress || '—'}
+                </td>
                 <td className="ah-tabnum">{r.nationalId || '—'}</td>
                 <td>{r.grade}</td>
                 <td className="ah-tabnum">{r.phone}</td>

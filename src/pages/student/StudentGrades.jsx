@@ -1,12 +1,48 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { orderBy, where } from 'firebase/firestore';
+import { where } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import { EmptyRow, ErrorBanner } from '../../components/ui';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { useMyStudent } from '../../hooks/useMyStudent';
 import { CURRENT_ACADEMIC_YEAR } from '../../lib/constants';
-import { scoreToBand } from '../../services/grades';
+import {
+  CONTINUOUS_TYPES,
+  assessmentTypeLabel,
+  isContinuousType,
+  scoreToBand,
+} from '../../services/grades';
 import { demoGradeEntries } from '../../data/demo';
+
+function GradesTable({ rows, emptyLabel }) {
+  return (
+    <table className="table">
+      <thead>
+        <tr>
+          <th>التقييم</th>
+          <th>النوع</th>
+          <th>المادة</th>
+          <th>الدرجة</th>
+          <th>التقدير</th>
+          <th>الفصل</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.length === 0 && <EmptyRow colSpan={6}>{emptyLabel}</EmptyRow>}
+        {rows.map((g) => (
+          <tr key={g.id}>
+            <td style={{ fontWeight: 600 }}>{g.assessmentTitle || 'تقييم'}</td>
+            <td style={{ fontSize: 12 }}>{assessmentTypeLabel(g.assessmentType) || '—'}</td>
+            <td>{g.subject || g.className || '—'}</td>
+            <td className="ah-tabnum">{g.score}/{g.maxScore}</td>
+            <td>{scoreToBand(g.score, g.maxScore)}</td>
+            <td style={{ fontSize: 12 }}>{g.term || '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
 export default function StudentGrades() {
   const { studentId, displayName, error: stuErr, demo } = useMyStudent();
@@ -16,15 +52,33 @@ export default function StudentGrades() {
     demoGradeEntries.filter((g) => g.studentId === 's1'),
     studentId || '__none__',
   );
-  const approved = (grades || []).filter((g) => g.status === 'معتمد');
+  const approved = useMemo(() => (grades || []).filter((g) => g.status === 'معتمد'), [grades]);
+  const continuous = useMemo(
+    () => approved.filter((g) => isContinuousType(g.assessmentType)),
+    [approved],
+  );
+  const exams = useMemo(
+    () => approved.filter((g) => !isContinuousType(g.assessmentType)),
+    [approved],
+  );
   const pending = (grades || []).filter((g) => g.status === 'قيد المراجعة');
+
+  const continuousByType = useMemo(() => {
+    return CONTINUOUS_TYPES.map((type) => ({
+      type,
+      label: assessmentTypeLabel(type),
+      rows: continuous.filter((g) => g.assessmentType === type),
+    }));
+  }, [continuous]);
 
   return (
     <div className="stu-page">
       <ErrorBanner>{(stuErr || error) && 'تعذّر تحميل الدرجات.'}</ErrorBanner>
       <header className="stu-page-head">
         <h1 className="stu-page-title">درجاتي</h1>
-        <p className="stu-page-lead">الدرجات المعتمدة (امتحان شهري / نصف فصل / نهاية فصل…) للعام {CURRENT_ACADEMIC_YEAR} — {displayName}</p>
+        <p className="stu-page-lead">
+          درجات الدفتر والحضور والنشاط والاختبارات المعتمدة للعام {CURRENT_ACADEMIC_YEAR} — {displayName}
+        </p>
       </header>
 
       <div className="stu-actions-row">
@@ -36,50 +90,36 @@ export default function StudentGrades() {
         </Link>
       </div>
 
+      {pending.length > 0 && (
+        <div className="card" style={{ fontSize: 13, color: 'var(--color-neutral-700)' }}>
+          لديك {pending.length} درجة بانتظار اعتماد الإدارة — ستظهر هنا عند الاعتماد.
+        </div>
+      )}
+
       <section className="card ah-table-wrap" style={{ padding: 0 }}>
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)' }}>
-          <h2 className="card-title" style={{ margin: 0 }}>الدرجات المعتمدة · {approved.length}</h2>
+          <h2 className="card-title" style={{ margin: 0 }}>درجات مستمرة · دفتر / حضور / نشاط · {continuous.length}</h2>
         </div>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>التقييم</th>
-              <th>النوع</th>
-              <th>المادة</th>
-              <th>الدرجة</th>
-              <th>التقدير</th>
-              <th>الفصل</th>
-            </tr>
-          </thead>
-          <tbody>
-            {approved.length === 0 && <EmptyRow colSpan={6}>لا درجات معتمدة بعد.</EmptyRow>}
-            {approved.map((g) => {
-              const pct = g.maxScore ? Math.round((Number(g.score) / Number(g.maxScore)) * 100) : null;
-              return (
-                <tr key={g.id}>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{g.assessmentTitle || 'تقييم'}</div>
-                    <div className="stu-class-meta">{g.className || ''}</div>
-                  </td>
-                  <td style={{ fontSize: 12 }}>{g.assessmentType || '—'}</td>
-                  <td>{g.subject || '—'}</td>
-                  <td className="ah-tabnum" style={{ fontWeight: 700 }}>{g.score}/{g.maxScore}{pct != null ? ` (${pct}%)` : ''}</td>
-                  <td><span className="tag tag-accent">{scoreToBand(g.score, g.maxScore)}</span></td>
-                  <td>{g.term || '—'}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        {continuous.length === 0 ? (
+          <div style={{ padding: 16, fontSize: 13, color: 'var(--color-neutral-500)' }}>لا درجات مستمرة معتمدة بعد.</div>
+        ) : (
+          continuousByType.filter((b) => b.rows.length > 0).map((b) => (
+            <div key={b.type}>
+              <div style={{ padding: '10px 16px', fontSize: 13, fontWeight: 700, background: 'color-mix(in srgb, var(--color-neutral-100) 80%, transparent)' }}>
+                {b.label} · {b.rows.length}
+              </div>
+              <GradesTable rows={b.rows} emptyLabel="—" />
+            </div>
+          ))
+        )}
       </section>
 
-      {pending.length > 0 && (
-        <section className="card">
-          <h2 className="card-title" style={{ marginBottom: 8 }}>قيد المراجعة · {pending.length}</h2>
-          <p className="stu-empty">رُصدت هذه الدرجات من المعلّم وما زالت بانتظار اعتماد الإدارة — لن تظهر في كشف العلامات حتى تُعتمد.</p>
-        </section>
-      )}
-      {demo && <p className="stu-class-meta">وضع العرض التوضيحي.</p>}
+      <section className="card ah-table-wrap" style={{ padding: 0 }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)' }}>
+          <h2 className="card-title" style={{ margin: 0 }}>اختبارات وفرض · {exams.length}</h2>
+        </div>
+        <GradesTable rows={exams} emptyLabel="لا درجات اختبارات معتمدة بعد." />
+      </section>
     </div>
   );
 }

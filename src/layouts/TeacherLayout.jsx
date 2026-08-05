@@ -6,13 +6,15 @@ import { useAuth } from '../context/AuthContext';
 
 const NAV_PRIMARY = [
   { to: '/teacher', end: true, label: 'لوحتي', icon: 'dashboard' },
+  { to: '/teacher/punch', label: 'تسجيل الحضور', icon: 'fingerprint' },
   { to: '/teacher/inbox', label: 'إشعاراتي', icon: 'notifications' },
   { to: '/teacher/schedule', label: 'جدول الحصص', icon: 'calendar_month' },
   { to: '/teacher/classes', label: 'صفوفي', icon: 'school' },
   { to: '/teacher/students', label: 'كل طلابي', icon: 'group' },
-  { to: '/teacher/attendance', label: 'الحضور والغياب', icon: 'fact_check' },
+  { to: '/teacher/attendance', label: 'حضور الطلاب', icon: 'fact_check' },
   { to: '/teacher/attendance-report', label: 'تقرير الحضور', icon: 'analytics' },
   { to: '/teacher/grades', label: 'الدرجات', icon: 'grade' },
+  { to: '/teacher/continuous-grades', label: 'دفتر·حضور·نشاط', icon: 'draw' },
   { to: '/teacher/bulk-grades', label: 'رصد جماعي', icon: 'grid_view' },
   { to: '/teacher/grade-sheet', label: 'كشف درجات', icon: 'print' },
   { to: '/teacher/exams', label: 'تقويم اختبارات', icon: 'event' },
@@ -30,13 +32,15 @@ const NAV_EXTRA = [
 
 const TITLES = {
   '/teacher': 'لوحة المعلّم',
+  '/teacher/punch': 'تسجيل الحضور والانصراف',
   '/teacher/inbox': 'إشعاراتي',
   '/teacher/schedule': 'جدول الحصص',
   '/teacher/classes': 'صفوفي',
   '/teacher/students': 'كل طلابي',
-  '/teacher/attendance': 'الحضور والغياب',
+  '/teacher/attendance': 'حضور الطلاب',
   '/teacher/attendance-report': 'تقرير الحضور',
   '/teacher/grades': 'الدرجات',
+  '/teacher/continuous-grades': 'درجات دفتر وحضور ونشاط',
   '/teacher/bulk-grades': 'رصد درجات جماعي',
   '/teacher/grade-sheet': 'كشف درجات للطباعة',
   '/teacher/exams': 'تقويم اختبارات الصف',

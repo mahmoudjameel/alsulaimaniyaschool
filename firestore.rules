@@ -144,8 +144,40 @@ service cloud.firestore {
     match /payroll/{id} { allow read, write: if hasPerm('payroll.manage'); }
     match /staff/{id} {
       allow read, write: if hasPerm('payroll.manage') || hasPerm('staff.manage');
-      match /attendance/{period} { allow read, write: if hasPerm('payroll.manage') || hasPerm('staff.manage'); }
+      match /attendance/{period} {
+        allow read, write: if hasPerm('payroll.manage') || hasPerm('staff.manage')
+          || (isSignedIn()
+            && get(/databases/$(database)/documents/staff/$(id)).data.authUid == request.auth.uid);
+      }
     }
+
+    // School GPS center + geofence for teacher punch
+    match /schoolSettings/{id} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdmin() || hasPerm('staff.manage');
+      allow delete: if isAdmin();
+    }
+
+    // Staff daily check-in / check-out (location-verified) — teacher, accountant, reception
+    match /staffAttendanceDays/{id} {
+      // get: allow own day-doc by id prefix even when it does not exist yet
+      // (otherwise first punch fails on getDoc of a missing document).
+      allow get: if isAdmin() || hasPerm('staff.manage') || hasPerm('payroll.manage')
+        || (isSignedIn() && isStaff()
+          && id.matches('^' + request.auth.uid + '_.*'));
+      allow list: if isAdmin() || hasPerm('staff.manage') || hasPerm('payroll.manage');
+      allow create: if isSignedIn()
+        && isStaff()
+        && request.resource.data.teacherUid == request.auth.uid
+        && id == request.auth.uid + '_' + request.resource.data.date;
+      allow update: if isAdmin() || hasPerm('staff.manage')
+        || (isSignedIn()
+          && isStaff()
+          && resource.data.teacherUid == request.auth.uid
+          && request.resource.data.teacherUid == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
     match /disbursements/{id} {
       allow read, create: if hasPerm('disbursements.manage') || hasPerm('payroll.manage') || hasPerm('expenses.manage') || hasPerm('billing.manage');
       allow update: if hasPerm('disbursements.manage') || hasPerm('payroll.manage') || hasPerm('expenses.manage') || hasPerm('billing.manage');
