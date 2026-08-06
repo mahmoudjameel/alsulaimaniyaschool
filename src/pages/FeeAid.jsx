@@ -7,7 +7,8 @@ import Modal from '../components/Modal';
 import { EmptyRow, ErrorBanner, Field, SegmentedTabs } from '../components/ui';
 import { useLiveOrDemo } from '../hooks/useFirestore';
 import { useAuth } from '../context/AuthContext';
-import { CURRENT_ACADEMIC_YEAR, formatILS, shekelsToMinorUnits } from '../lib/constants';
+import { formatILS, shekelsToMinorUnits } from '../lib/constants';
+import { useAcademicYearLabel } from '../components/AcademicYearText';
 import { currentPeriod, periodLabel } from '../lib/staff';
 import { relativeDaysAr, relativeFromTimestamp } from '../lib/relativeTime';
 import {
@@ -58,6 +59,7 @@ function mergeWithOverlay(raw, overlays, isDemo) {
 export default function FeeAid() {
   const { pathname } = useLocation();
   const { profile } = useAuth();
+  const { academicYear } = useAcademicYearLabel();
   const actor = { uid: profile?.id, name: profile?.name, role: profile?.role };
 
   const { data: students, error, demo } = useLiveOrDemo('students', [orderBy('name', 'asc')], demoStudents);
@@ -222,7 +224,7 @@ export default function FeeAid() {
         <div style={{ flex: '1 1 240px' }}>
           <h4 style={{ margin: '0 0 4px' }}>خصم · إعفاء · تقسيط</h4>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--color-neutral-600)', lineHeight: 1.7 }}>
-            إدارة كاملة للمنح والإعفاءات الإنسانية وخصم الإخوة والموظفين، مع خطط تقسيط شهرية ومتابعة كل قسط حتى السداد — العام {CURRENT_ACADEMIC_YEAR}.
+            إدارة كاملة للمنح والإعفاءات الإنسانية وخصم الإخوة والموظفين، مع خطط تقسيط شهرية ومتابعة كل قسط حتى السداد — العام {academicYear}.
           </p>
         </div>
         <button type="button" className="btn btn-secondary" style={{ fontSize: 13 }} onClick={() => openPlan()}>
@@ -493,7 +495,7 @@ export default function FeeAid() {
                       </table>
                     </div>
                     <div style={{ padding: '10px 16px', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontSize: 12, color: 'var(--color-neutral-600)' }}>
-                      <span>العام {plan.academicYear || CURRENT_ACADEMIC_YEAR}</span>
+                      <span>العام {plan.academicYear || academicYear}</span>
                       {plan.createdByName && <span>· بواسطة {plan.createdByName}</span>}
                       <span style={{ marginInlineStart: 'auto' }} />
                       {plan.status === 'نشط' && scheduled > 0 && (
@@ -567,6 +569,7 @@ function Kpi({ label, value, gold }) {
 }
 
 function DiscountModal({ students, demo, actor, initialStudentId, onClose, onSaved, onDemoSaved }) {
+  const { academicYear } = useAcademicYearLabel();
   const [studentId, setStudentId] = useState(initialStudentId || students[0]?.id || '');
   const [pickerSearch, setPickerSearch] = useState('');
   const [mode, setMode] = useState('amount');
@@ -610,7 +613,7 @@ function DiscountModal({ students, demo, actor, initialStudentId, onClose, onSav
           reason,
           reference,
           notes,
-          academicYear: CURRENT_ACADEMIC_YEAR,
+          academicYear,
           status: 'مفعّل',
           createdByName: actor?.name || '—',
           daysAgo: 0,
@@ -702,6 +705,7 @@ function DiscountModal({ students, demo, actor, initialStudentId, onClose, onSav
 }
 
 function InstallmentModal({ students, demo, actor, initialStudentId, onClose, onSaved, onDemoSaved }) {
+  const { academicYear } = useAcademicYearLabel();
   const defaultStudent = students.find((s) => s.id === initialStudentId) || students[0];
   const [studentId, setStudentId] = useState(defaultStudent?.id || '');
   const [pickerSearch, setPickerSearch] = useState('');
@@ -766,7 +770,7 @@ function InstallmentModal({ students, demo, actor, initialStudentId, onClose, on
             startPeriod,
             status: 'نشط',
             notes,
-            academicYear: CURRENT_ACADEMIC_YEAR,
+            academicYear,
             paidCount: 0,
             createdByName: actor?.name || '—',
             daysAgo: 0,
@@ -806,7 +810,7 @@ function InstallmentModal({ students, demo, actor, initialStudentId, onClose, on
   return (
     <Modal title="خطة تقسيط جديدة" onClose={onClose} onSubmit={onSubmit} submitLabel="إنشاء الخطة" submitting={submitting} error={error} width={580}>
       <div className="dialog-body">
-        يُقسَّم المبلغ على الأشهر أدناه. القسط الأخير يستوعب أي فرق تقريب. العام {CURRENT_ACADEMIC_YEAR}.
+        يُقسَّم المبلغ على الأشهر أدناه. القسط الأخير يستوعب أي فرق تقريب. العام {academicYear}.
       </div>
       <SearchInput
         value={pickerSearch}

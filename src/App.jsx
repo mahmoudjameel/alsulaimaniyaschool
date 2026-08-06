@@ -17,6 +17,7 @@ import Payroll from './pages/admin/Payroll';
 import Staff from './pages/admin/Staff';
 import StaffAttendance from './pages/admin/StaffAttendance';
 import SchoolSite from './pages/admin/SchoolSite';
+import AcademicYear from './pages/admin/AcademicYear';
 import Disbursements from './pages/Disbursements';
 import Expenses from './pages/admin/Expenses';
 import FeeAid from './pages/FeeAid';
@@ -131,6 +132,7 @@ export default function App() {
             <Route path="staff" element={<Staff />} />
             <Route path="staff-attendance" element={<StaffAttendance />} />
             <Route path="school-site" element={<SchoolSite />} />
+            <Route path="academic-year" element={<AcademicYear />} />
             <Route path="disbursements" element={<Disbursements />} />
             <Route path="expenses" element={<Expenses />} />
             <Route path="classes" element={<Classes />} />

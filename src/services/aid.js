@@ -1,6 +1,7 @@
 import { addDoc, collection, doc, getDoc, getDocs, increment, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { CURRENT_ACADEMIC_YEAR, shekelsToMinorUnits } from '../lib/constants';
+import { shekelsToMinorUnits } from '../lib/constants';
+import { resolveAcademicYear } from '../lib/liveAcademicYear';
 import { logActivity } from './activity';
 import { notifyMany } from './notifications';
 
@@ -33,9 +34,10 @@ export async function applyStudentDiscount({
   reason,
   reference,
   notes,
-  academicYear = CURRENT_ACADEMIC_YEAR,
+  academicYear,
   actor,
 }) {
+  const year = await resolveAcademicYear(academicYear);
   let amountMinorUnits = 0;
   if (mode === 'full') {
     amountMinorUnits = Math.max(0, Number(balanceMinorUnits) || 0);
@@ -66,7 +68,7 @@ export async function applyStudentDiscount({
       reason: (reason || '').trim() || null,
       reference: (reference || '').trim() || null,
       notes: (notes || '').trim() || null,
-      academicYear,
+      academicYear: year,
       status: 'مفعّل',
       createdAt: serverTimestamp(),
       createdBy: actor?.uid || null,
@@ -108,8 +110,9 @@ export async function createInstallmentPlan({
   actor,
   postFirst = true,
   notes,
-  academicYear = CURRENT_ACADEMIC_YEAR,
+  academicYear,
 }) {
+  const year = await resolveAcademicYear(academicYear);
   const totalMinor = shekelsToMinorUnits(totalShekels);
   const n = Math.max(2, Math.min(12, Number(months) || 2));
   if (!totalMinor || totalMinor <= 0) throw new Error('invalid total');
@@ -127,7 +130,7 @@ export async function createInstallmentPlan({
     startPeriod: start,
     status: 'نشط',
     notes: (notes || '').trim() || null,
-    academicYear,
+    academicYear: year,
     paidCount: postFirst ? 0 : 0,
     dueCount: postFirst ? 1 : 0,
     createdAt: serverTimestamp(),

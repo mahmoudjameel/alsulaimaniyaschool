@@ -8,11 +8,14 @@ import { useAuth } from '../../context/AuthContext';
 import { useMyClasses } from '../../hooks/useMyClasses';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { demoEnrollments, demoGradeEntries } from '../../data/demo';
-import { CURRENT_ACADEMIC_YEAR, SCHOOL_NAME_AR } from '../../lib/constants';
+import { SCHOOL_NAME_AR } from '../../lib/constants';
+import { useAcademicYearLabel } from '../../components/AcademicYearText';
+import TermSelect from '../../components/TermSelect';
 import { ASSESSMENT_TYPES, scoreToBand } from '../../services/grades';
 
 export default function TeacherGradeSheet() {
   const { profile } = useAuth();
+  const { academicYear } = useAcademicYearLabel();
   const [params] = useSearchParams();
   const { myClasses, error, demo } = useMyClasses();
   const [classId, setClassId] = useState(params.get('class') || '');
@@ -128,11 +131,7 @@ export default function TeacherGradeSheet() {
         </div>
         <div className="field" style={{ minWidth: 140 }}>
           <label>الفصل</label>
-          <select className="input" value={term} onChange={(e) => setTerm(e.target.value)}>
-            <option value="">الكل</option>
-            <option value="الفصل الأول">الفصل الأول</option>
-            <option value="الفصل الثاني">الفصل الثاني</option>
-          </select>
+          <TermSelect value={term} onChange={setTerm} allowEmpty emptyLabel="الكل" disabledClosed={false} />
         </div>
         <div className="field" style={{ minWidth: 140 }}>
           <label>الحالة</label>
@@ -156,7 +155,7 @@ export default function TeacherGradeSheet() {
             <Logo size={44} />
             <div>
               <div style={{ fontWeight: 800, fontSize: 18 }}>{SCHOOL_NAME_AR}</div>
-              <div style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>كشف درجات صفّي · {CURRENT_ACADEMIC_YEAR}</div>
+              <div style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>كشف درجات صفّي · {academicYear}</div>
             </div>
           </div>
           <div style={{ fontSize: 13, textAlign: 'left', color: 'var(--color-neutral-700)' }}>

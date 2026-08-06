@@ -3,11 +3,12 @@ import Modal from '../components/Modal';
 import { Field } from '../components/ui';
 import PhoneWhatsAppField from '../components/PhoneWhatsAppField';
 import {
-  composeFullName, CURRENT_ACADEMIC_YEAR, formatGradeLabel,
+  composeFullName, formatGradeLabel,
   GUARDIAN_WORK_STATUS_OPTIONS, HOUSING_TYPE_OPTIONS, SECTION_OPTIONS,
 } from '../lib/constants';
 import { isValidLocalMobile, normalizeLocalMobile, parseStoredPhone, phoneKeyFromLocal, toE164Display, toWhatsAppNumber } from '../lib/phone';
 import { useAcademicStages } from '../hooks/useAcademicStages';
+import { useAcademicYearLabel } from '../components/AcademicYearText';
 import { updateStudent } from '../services/students';
 import { logActivity } from '../services/activity';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +18,7 @@ const STATUS_OPTIONS = ['نشط', 'موقوف', 'متخرّج', 'منسحب'];
 export default function EditStudentModal({ student, onClose, demo }) {
   const { profile } = useAuth();
   const { stages, labels } = useAcademicStages();
+  const { academicYear: liveYear } = useAcademicYearLabel();
   const initialPhone = parseStoredPhone(student);
 
   const [nameFirst, setNameFirst] = useState(student.nameFirst || '');
@@ -35,7 +37,7 @@ export default function EditStudentModal({ student, onClose, demo }) {
   const [stageId, setStageId] = useState(student.stageId || '');
   const [classSection, setClassSection] = useState(student.classSection || SECTION_OPTIONS[0]);
   const [ageYears, setAgeYears] = useState(student.ageYears ?? '');
-  const [academicYear, setAcademicYear] = useState(student.academicYear || CURRENT_ACADEMIC_YEAR);
+  const [academicYear, setAcademicYear] = useState(student.academicYear || liveYear);
   const [shift, setShift] = useState(student.shift || 'صباحي');
   const [status, setStatus] = useState(student.status || 'نشط');
   const [submitting, setSubmitting] = useState(false);
@@ -97,7 +99,7 @@ export default function EditStudentModal({ student, onClose, demo }) {
         stageLabel,
         classSection: classSection || null,
         ageYears: ageYears !== '' ? Number(ageYears) : null,
-        academicYear: academicYear || CURRENT_ACADEMIC_YEAR,
+        academicYear: academicYear || liveYear,
         grade: gradeLabel,
         shift,
         status,

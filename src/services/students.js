@@ -3,8 +3,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import {
-  composeFullName, CURRENT_ACADEMIC_YEAR, formatGradeLabel, GRADE_OPTIONS,
+  composeFullName, formatGradeLabel, GRADE_OPTIONS,
 } from '../lib/constants';
+import { resolveAcademicYear } from '../lib/liveAcademicYear';
 import { phoneKeyFromLocal } from '../lib/phone';
 
 export const studentsCol = collection(db, 'students');
@@ -36,6 +37,8 @@ export async function createStudent(payload = {}) {
   const snap = await getDocs(query(collection(db, 'students')));
   const nextNumber = 1200 + snap.size + Math.floor(Math.random() * 90);
 
+  const year = await resolveAcademicYear(academicYear);
+
   const docRef = await addDoc(studentsCol, {
     name,
     nameFirst: (nameFirst || '').trim() || null,
@@ -43,7 +46,7 @@ export async function createStudent(payload = {}) {
     nameGrandfather: (nameGrandfather || '').trim() || null,
     nameFamily: (nameFamily || '').trim() || null,
     nationalId: (nationalId || '').trim() || null,
-    academicYear: academicYear || CURRENT_ACADEMIC_YEAR,
+    academicYear: year,
     stageId: stageId || null,
     stageLabel: stage,
     classSection: classSection || null,

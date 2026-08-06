@@ -7,7 +7,7 @@ import BackButton from '../components/BackButton';
 import { ErrorBanner } from '../components/ui';
 import { useDocOrDemo, useLiveOrDemo } from '../hooks/useFirestore';
 import { demoStudents, demoGradeEntries, demoAttendanceRecords } from '../data/demo';
-import { CURRENT_ACADEMIC_YEAR } from '../lib/constants';
+import { useAcademicYearLabel } from '../components/AcademicYearText';
 import { computeAttendanceRate } from '../lib/attendance';
 import { scoreToBand } from '../services/grades';
 
@@ -16,6 +16,7 @@ import { studentProfilePath } from '../lib/portalPaths';
 export default function ReportCard() {
   const { id } = useParams();
   const { pathname } = useLocation();
+  const { academicYear } = useAcademicYearLabel();
 
   const { data: student, error } = useDocOrDemo(`students/${id}`, demoStudents.find((s) => s.id === id) || null);
   const { data: grades } = useLiveOrDemo(
@@ -69,7 +70,7 @@ export default function ReportCard() {
         <Logo size={48} full />
         <div style={{ textAlign: 'left' }}>
           <div style={{ fontFamily: 'var(--font-heading)', fontSize: 18 }}>كشف العلامات</div>
-          <div style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}>العام الدراسي {CURRENT_ACADEMIC_YEAR}</div>
+          <div style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}>العام الدراسي {academicYear}</div>
         </div>
       </div>
 

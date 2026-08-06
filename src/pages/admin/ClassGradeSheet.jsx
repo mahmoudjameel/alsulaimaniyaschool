@@ -7,11 +7,14 @@ import BackButton from '../../components/BackButton';
 import { EmptyRow, ErrorBanner } from '../../components/ui';
 import { useDocOrDemo, useLiveOrDemo } from '../../hooks/useFirestore';
 import { demoClasses, demoEnrollments, demoGradeEntries } from '../../data/demo';
-import { CURRENT_ACADEMIC_YEAR, SCHOOL_NAME_AR } from '../../lib/constants';
+import { SCHOOL_NAME_AR } from '../../lib/constants';
+import { useAcademicYearLabel } from '../../components/AcademicYearText';
+import TermSelect from '../../components/TermSelect';
 import { ASSESSMENT_TYPES, scoreToBand } from '../../services/grades';
 
 export default function ClassGradeSheet() {
   const { id } = useParams();
+  const { academicYear } = useAcademicYearLabel();
   const { data: cls, error, demo } = useDocOrDemo(`classes/${id}`, demoClasses.find((c) => c.id === id) || demoClasses[0]);
   const [assessmentType, setAssessmentType] = useState('');
   const [term, setTerm] = useState('');
@@ -114,11 +117,7 @@ export default function ClassGradeSheet() {
         </div>
         <div className="field" style={{ minWidth: 140 }}>
           <label>الفصل</label>
-          <select className="input" value={term} onChange={(e) => setTerm(e.target.value)}>
-            <option value="">الكل</option>
-            <option value="الفصل الأول">الفصل الأول</option>
-            <option value="الفصل الثاني">الفصل الثاني</option>
-          </select>
+          <TermSelect value={term} onChange={setTerm} allowEmpty emptyLabel="الكل" disabledClosed={false} />
         </div>
         <div className="field" style={{ minWidth: 140 }}>
           <label>الحالة</label>
@@ -142,7 +141,7 @@ export default function ClassGradeSheet() {
             <Logo size={44} />
             <div>
               <div style={{ fontWeight: 800, fontSize: 18 }}>{SCHOOL_NAME_AR}</div>
-              <div style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>كشف درجات الصف · {CURRENT_ACADEMIC_YEAR}</div>
+              <div style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>كشف درجات الصف · {academicYear}</div>
             </div>
           </div>
           <div style={{ fontSize: 13, textAlign: 'left', color: 'var(--color-neutral-700)' }}>

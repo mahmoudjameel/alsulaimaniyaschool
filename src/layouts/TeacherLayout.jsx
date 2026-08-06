@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import Icon from '../components/Icon';
 import { useAuth } from '../context/AuthContext';
+import { useAcademicYearLabel } from '../components/AcademicYearText';
 
 const NAV_PRIMARY = [
   { to: '/teacher', end: true, label: 'لوحتي', icon: 'dashboard' },
@@ -64,6 +65,7 @@ export default function TeacherLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { profile, signOut } = useAuth();
+  const { academicYear } = useAcademicYearLabel();
   const [menuOpen, setMenuOpen] = useState(false);
   const firstName = (profile?.name || 'المعلّم').split(' ')[0];
 
@@ -140,10 +142,11 @@ export default function TeacherLayout() {
           <button type="button" className="panel-menu-btn" aria-label="فتح القائمة" onClick={() => setMenuOpen(true)}>
             <Icon name="menu" size={22} />
           </button>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div className="panel-topbar-title">{title}</div>
             <div className="panel-topbar-sub">{greetingForNow()} {firstName}</div>
           </div>
+          <span className="tag tag-neutral ah-hide-sm">العام {academicYear}</span>
         </header>
         <div className="panel-content">
           <Outlet />

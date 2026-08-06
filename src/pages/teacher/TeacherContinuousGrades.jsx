@@ -13,8 +13,8 @@ import {
   defaultMaxForType,
   submitGrade,
 } from '../../services/grades';
-
-const TERMS = ['الفصل الأول', 'الفصل الثاني'];
+import TermSelect, { useDefaultActiveTerm } from '../../components/TermSelect';
+import { isTermClosed } from '../../services/academicCalendar';
 
 const TYPE_HINT = {
   دفتر: 'متابعة حل الدفتر والواجبات المكتوبة في الصف.',
@@ -34,7 +34,8 @@ export default function TeacherContinuousGrades() {
   const [assessmentType, setAssessmentType] = useState(
     CONTINUOUS_TYPES.includes(typeFromUrl) ? typeFromUrl : 'دفتر',
   );
-  const [term, setTerm] = useState(TERMS[0]);
+  const [term, setTerm] = useState('');
+  const calendar = useDefaultActiveTerm(setTerm);
   const [periodLabel, setPeriodLabel] = useState('');
   const [maxScore, setMaxScore] = useState(String(defaultMaxForType('دفتر')));
   const [scores, setScores] = useState({});
@@ -123,8 +124,12 @@ export default function TeacherContinuousGrades() {
       }
       setMessage(`أُرسلت ${filled.length} درجة «${assessmentTypeLabel(assessmentType)}» للإدارة بانتظار الاعتماد — تظهر للطالب بعد الاعتماد.`);
       setScores({});
-    } catch {
-      setMessage('تعذّر إرسال بعض الدرجات.');
+    } catch (err) {
+      if (err?.code === 'TERM_CLOSED' || err?.message === 'TERM_CLOSED') {
+        setMessage(`الفصل «${term || err.term || ''}» مقفل من الإدارة — لا يُقبل إدخال درجات جديدة عليه.`);
+      } else {
+        setMessage('تعذّر إرسال بعض الدرجات.');
+      }
     } finally {
       setBusy(false);
     }
@@ -163,9 +168,7 @@ export default function TeacherContinuousGrades() {
           </div>
           <div className="field">
             <label>الفصل</label>
-            <select className="input" value={term} onChange={(e) => setTerm(e.target.value)}>
-              {TERMS.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <TermSelect value={term} onChange={setTerm} />
           </div>
           <div className="field">
             <label>من أصل</label>
@@ -181,6 +184,12 @@ export default function TeacherContinuousGrades() {
             />
           </div>
         </div>
+
+        {isTermClosed(calendar, term) && (
+          <div style={{ fontSize: 13, color: 'var(--color-accent-2-700)' }}>
+            هذا الفصل مقفل من الإدارة — لا يمكن إدخال درجات عليه.
+          </div>
+        )}
 
         <div style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>
           عنوان التقييم المرسل: <strong>{title}</strong>

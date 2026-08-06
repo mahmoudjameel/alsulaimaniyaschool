@@ -13,8 +13,8 @@ import {
   defaultMaxForType,
   submitGrade,
 } from '../../services/grades';
-
-const TERMS = ['الفصل الأول', 'الفصل الثاني', ''];
+import TermSelect, { useDefaultActiveTerm } from '../../components/TermSelect';
+import { isTermClosed } from '../../services/academicCalendar';
 
 export default function TeacherBulkGrades() {
   const { profile } = useAuth();
@@ -26,7 +26,8 @@ export default function TeacherBulkGrades() {
 
   const [assessmentType, setAssessmentType] = useState(ASSESSMENT_TYPES[0]);
   const [assessmentTitle, setAssessmentTitle] = useState('');
-  const [term, setTerm] = useState(TERMS[0]);
+  const [term, setTerm] = useState('');
+  const calendar = useDefaultActiveTerm(setTerm);
   const [maxScore, setMaxScore] = useState(String(defaultMaxForType(ASSESSMENT_TYPES[0])));
   const [scores, setScores] = useState({});
   const [busy, setBusy] = useState(false);
@@ -96,8 +97,12 @@ export default function TeacherBulkGrades() {
       }
       setMessage(`أُرسلت ${filled.length} درجة للإدارة بانتظار الاعتماد.`);
       setScores({});
-    } catch {
-      setMessage('تعذّر إرسال بعض الدرجات.');
+    } catch (err) {
+      if (err?.code === 'TERM_CLOSED' || err?.message === 'TERM_CLOSED') {
+        setMessage(`الفصل «${term || err.term || ''}» مقفل من الإدارة — لا يُقبل إدخال درجات جديدة عليه.`);
+      } else {
+        setMessage('تعذّر إرسال بعض الدرجات.');
+      }
     } finally {
       setBusy(false);
     }
@@ -133,17 +138,18 @@ export default function TeacherBulkGrades() {
           </div>
           <div className="field">
             <label>الفصل</label>
-            <select className="input" value={term} onChange={(e) => setTerm(e.target.value)}>
-              <option value={TERMS[0]}>{TERMS[0]}</option>
-              <option value={TERMS[1]}>{TERMS[1]}</option>
-              <option value="">غير محدد</option>
-            </select>
+            <TermSelect value={term} onChange={setTerm} allowEmpty emptyLabel="غير محدد" />
           </div>
           <div className="field">
             <label>من أصل</label>
             <input className="input" type="number" value={maxScore} onChange={(e) => setMaxScore(e.target.value)} dir="ltr" required />
           </div>
         </div>
+        {isTermClosed(calendar, term) && (
+          <div style={{ fontSize: 13, color: 'var(--color-accent-2-700)' }}>
+            هذا الفصل مقفل من الإدارة — لا يمكن إدخال درجات عليه.
+          </div>
+        )}
         <div className="field">
           <label>عنوان التقييم</label>
           <input className="input" value={assessmentTitle} onChange={(e) => setAssessmentTitle(e.target.value)} placeholder={assessmentType} required={assessmentType === 'أخرى'} />

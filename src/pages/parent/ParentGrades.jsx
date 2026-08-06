@@ -6,12 +6,13 @@ import Icon from '../../components/Icon';
 import { EmptyRow, ErrorBanner } from '../../components/ui';
 import { useMyChildren } from '../../hooks/useMyChildren';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
-import { CURRENT_ACADEMIC_YEAR } from '../../lib/constants';
+import { useAcademicYearLabel } from '../../components/AcademicYearText';
 import { assessmentTypeLabel, scoreToBand } from '../../services/grades';
 import { demoGradeEntries } from '../../data/demo';
 
 export default function ParentGrades() {
   const { children, error: childErr, demo } = useMyChildren();
+  const { academicYear } = useAcademicYearLabel();
   const [selectedId, setSelectedId] = useState(children[0]?.id || '');
 
   useEffect(() => {
@@ -36,7 +37,7 @@ export default function ParentGrades() {
       <ErrorBanner>{(childErr || error) && 'تعذّر تحميل الدرجات.'}</ErrorBanner>
       <header className="stu-page-head">
         <h1 className="stu-page-title">درجات الأبناء</h1>
-        <p className="stu-page-lead">الدرجات المعتمدة للعام {CURRENT_ACADEMIC_YEAR}</p>
+        <p className="stu-page-lead">الدرجات المعتمدة للعام {academicYear}</p>
       </header>
 
       <ChildSwitcher children={children} selectedId={activeId} onChange={setSelectedId} />

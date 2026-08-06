@@ -2,12 +2,12 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import Logo from '../components/Logo';
 import {
-  CURRENT_ACADEMIC_YEAR,
   SCHOOL_LOCATION_AR,
   SCHOOL_NAME_AR,
   SCHOOL_TAGLINE_AR,
   SHOW_FAMILY_PORTALS,
 } from '../lib/constants';
+import AcademicYearText from '../components/AcademicYearText';
 
 const STAFF_PORTALS = [
   {
@@ -68,7 +68,7 @@ export default function Launcher() {
         <header className="launch-top">
           <Logo size={46} />
           <div className="launch-top-meta">
-            <span className="launch-year">العام الدراسي {CURRENT_ACADEMIC_YEAR}</span>
+            <span className="launch-year"><AcademicYearText /></span>
             <span className="launch-place">{SCHOOL_TAGLINE_AR}</span>
           </div>
         </header>

@@ -15,12 +15,14 @@ import {
   demoStudents,
 } from '../../data/demo';
 import { computeAttendanceRate } from '../../lib/attendance';
-import { CURRENT_ACADEMIC_YEAR, SCHOOL_NAME_AR } from '../../lib/constants';
+import { SCHOOL_NAME_AR } from '../../lib/constants';
+import { useAcademicYearLabel } from '../../components/AcademicYearText';
 import { scoreToBand } from '../../services/grades';
 
 export default function TeacherStudentReport() {
   const { id } = useParams();
   const { profile } = useAuth();
+  const { academicYear } = useAcademicYearLabel();
   const { students, myClasses } = useMyStudents();
   const roster = students.find((s) => s.studentId === id);
   const myClassIds = useMemo(() => new Set(myClasses.map((c) => c.id)), [myClasses]);
@@ -90,7 +92,7 @@ export default function TeacherStudentReport() {
             <Logo size={48} />
             <div>
               <div style={{ fontWeight: 800, fontSize: 18 }}>{SCHOOL_NAME_AR}</div>
-              <div style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>تقرير طالب للمتابعة · {CURRENT_ACADEMIC_YEAR}</div>
+              <div style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>تقرير طالب للمتابعة · {academicYear}</div>
             </div>
           </div>
           <div style={{ fontSize: 13, textAlign: 'left' }}>

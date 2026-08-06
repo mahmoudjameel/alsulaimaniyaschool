@@ -80,6 +80,17 @@ export async function unenrollStudent(classId, studentId) {
   await updateDoc(doc(db, 'classes', classId), { studentsCount: increment(-1) });
 }
 
+/** Remove a student from every class enrollment (both sides). Returns count cleared. */
+export async function clearStudentEnrollments(studentId) {
+  const snap = await getDocs(collection(db, 'students', studentId, 'classes'));
+  let n = 0;
+  for (const d of snap.docs) {
+    await unenrollStudent(d.id, studentId);
+    n += 1;
+  }
+  return n;
+}
+
 // ---- Lessons (per class) ----
 export const lessonsQuery = (classId) => query(collection(db, 'classes', classId, 'lessons'), orderBy('order', 'asc'));
 

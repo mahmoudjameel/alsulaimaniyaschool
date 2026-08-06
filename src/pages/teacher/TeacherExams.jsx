@@ -7,6 +7,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useMyClasses } from '../../hooks/useMyClasses';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { submitClassExam } from '../../services/classExams';
+import TermSelect, { useDefaultActiveTerm } from '../../components/TermSelect';
+import { isTermClosed } from '../../services/academicCalendar';
 
 export default function TeacherExams() {
   const { profile } = useAuth();
@@ -21,7 +23,8 @@ export default function TeacherExams() {
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [notes, setNotes] = useState('');
-  const [term, setTerm] = useState('الفصل الأول');
+  const [term, setTerm] = useState('');
+  const calendar = useDefaultActiveTerm(setTerm);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -66,8 +69,12 @@ export default function TeacherExams() {
       setMessage('أُرسل الموعد للإدارة — يظهر للطالب وولي الأمر بعد الاعتماد.');
       setTitle('');
       setNotes('');
-    } catch {
-      setMessage('تعذّر الإرسال.');
+    } catch (err) {
+      if (err?.code === 'TERM_CLOSED' || err?.message === 'TERM_CLOSED') {
+        setMessage(`الفصل «${term || err.term || ''}» مقفل من الإدارة — لا يُقبل مواعيد اختبار عليه.`);
+      } else {
+        setMessage('تعذّر الإرسال.');
+      }
     } finally {
       setBusy(false);
     }
@@ -108,11 +115,13 @@ export default function TeacherExams() {
         </div>
         <div className="field">
           <label>الفصل</label>
-          <select className="input" value={term} onChange={(e) => setTerm(e.target.value)}>
-            <option>الفصل الأول</option>
-            <option>الفصل الثاني</option>
-          </select>
+          <TermSelect value={term} onChange={setTerm} />
         </div>
+        {isTermClosed(calendar, term) && (
+          <div style={{ fontSize: 13, color: 'var(--color-accent-2-700)' }}>
+            هذا الفصل مقفل من الإدارة — لا يمكن إرسال مواعيد اختبار عليه.
+          </div>
+        )}
         <div className="field">
           <label>ملاحظات</label>
           <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />

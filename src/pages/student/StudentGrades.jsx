@@ -5,7 +5,7 @@ import Icon from '../../components/Icon';
 import { EmptyRow, ErrorBanner } from '../../components/ui';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { useMyStudent } from '../../hooks/useMyStudent';
-import { CURRENT_ACADEMIC_YEAR } from '../../lib/constants';
+import { useAcademicYearLabel } from '../../components/AcademicYearText';
 import {
   CONTINUOUS_TYPES,
   assessmentTypeLabel,
@@ -46,6 +46,7 @@ function GradesTable({ rows, emptyLabel }) {
 
 export default function StudentGrades() {
   const { studentId, displayName, error: stuErr, demo } = useMyStudent();
+  const { academicYear } = useAcademicYearLabel();
   const { data: grades, error } = useLiveOrDemo(
     'gradeEntries',
     [where('studentId', '==', studentId || '__none__')],
@@ -77,7 +78,7 @@ export default function StudentGrades() {
       <header className="stu-page-head">
         <h1 className="stu-page-title">درجاتي</h1>
         <p className="stu-page-lead">
-          درجات الدفتر والحضور والنشاط والاختبارات المعتمدة للعام {CURRENT_ACADEMIC_YEAR} — {displayName}
+          درجات الدفتر والحضور والنشاط والاختبارات المعتمدة للعام {academicYear} — {displayName}
         </p>
       </header>
 

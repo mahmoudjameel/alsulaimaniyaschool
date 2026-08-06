@@ -5,12 +5,13 @@ import Icon from '../../components/Icon';
 import { ErrorBanner } from '../../components/ui';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { useMyStudent } from '../../hooks/useMyStudent';
-import { CURRENT_ACADEMIC_YEAR } from '../../lib/constants';
+import { useAcademicYearLabel } from '../../components/AcademicYearText';
 import { computeAttendanceRate } from '../../lib/attendance';
 import { demoAttendanceRecords, demoGradeEntries } from '../../data/demo';
 
 export default function StudentAchievements() {
   const { studentId, error, demo } = useMyStudent();
+  const { academicYear } = useAcademicYearLabel();
 
   const { data: gradesLive } = useLiveOrDemo(
     'gradeEntries',
@@ -49,7 +50,7 @@ export default function StudentAchievements() {
       <ErrorBanner>{error && 'تعذّر تحميل بيانات التقدّم.'}</ErrorBanner>
       <header className="stu-page-head">
         <h1 className="stu-page-title">تقدّمي الدراسي</h1>
-        <p className="stu-page-lead">ملخصك للعام {CURRENT_ACADEMIC_YEAR} — بدون مقارنة علنية مع زملائك.</p>
+        <p className="stu-page-lead">ملخصك للعام {academicYear} — بدون مقارنة علنية مع زملائك.</p>
       </header>
 
       <div className="stu-actions-row">

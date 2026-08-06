@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import Icon from '../components/Icon';
 import { useAuth } from '../context/AuthContext';
+import { useAcademicYearLabel } from '../components/AcademicYearText';
 
 const NAV = [
   { to: '/reception', end: true, label: 'لوحتي', icon: 'dashboard', permission: null },
@@ -26,6 +27,7 @@ export default function ReceptionLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { profile, signOut, can, isFirebaseConfigured } = useAuth();
+  const { academicYear } = useAcademicYearLabel();
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => { setMenuOpen(false); }, [pathname]);
@@ -92,6 +94,7 @@ export default function ReceptionLayout() {
             <Icon name="menu" size={22} />
           </button>
           <h3 className="panel-page-title">{pageTitle}</h3>
+          <span className="tag tag-neutral ah-hide-sm">العام {academicYear}</span>
         </header>
         <div className="panel-content"><Outlet /></div>
       </main>

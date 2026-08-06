@@ -4,7 +4,8 @@ import Icon from '../../components/Icon';
 import { ErrorBanner } from '../../components/ui';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { filterStudentAnnouncements, useMyStudent } from '../../hooks/useMyStudent';
-import { CURRENT_ACADEMIC_YEAR, formatILS } from '../../lib/constants';
+import { formatILS } from '../../lib/constants';
+import { useAcademicYearLabel } from '../../components/AcademicYearText';
 import { relativeFromTimestamp, relativeHoursAr } from '../../lib/relativeTime';
 import {
   demoAnnouncements,
@@ -27,6 +28,7 @@ export default function StudentHome() {
   const {
     profile, student, studentId, enrolled, error: studentErr, demo, displayName, displayId, gradeLabel,
   } = useMyStudent();
+  const { academicYear } = useAcademicYearLabel();
 
   const enrolledView = demo
     ? demoStudentClasses.map((c, i) => ({
@@ -72,7 +74,7 @@ export default function StudentHome() {
           <p className="stu-kicker">{greeting}</p>
           <h1 className="stu-hello">{displayName}</h1>
           <p className="stu-hello-sub">
-            {[gradeLabel, displayId, CURRENT_ACADEMIC_YEAR].filter(Boolean).join(' · ')}
+            {[gradeLabel, displayId, academicYear].filter(Boolean).join(' · ')}
           </p>
         </div>
         <div className="stu-hero-stats">

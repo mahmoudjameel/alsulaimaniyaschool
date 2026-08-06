@@ -3,11 +3,12 @@ import Modal from '../components/Modal';
 import { Field } from '../components/ui';
 import PhoneWhatsAppField from '../components/PhoneWhatsAppField';
 import {
-  composeFullName, CURRENT_ACADEMIC_YEAR, GUARDIAN_WORK_STATUS_OPTIONS,
+  composeFullName, GUARDIAN_WORK_STATUS_OPTIONS,
   HOUSING_TYPE_OPTIONS, SECTION_OPTIONS,
 } from '../lib/constants';
 import { isValidLocalMobile, normalizeLocalMobile, phoneKeyFromLocal, toE164Display, toWhatsAppNumber } from '../lib/phone';
 import { useAcademicStages } from '../hooks/useAcademicStages';
+import { useAcademicYearLabel } from '../components/AcademicYearText';
 import { createStudent } from '../services/students';
 import { logActivity } from '../services/activity';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +16,7 @@ import { useAuth } from '../context/AuthContext';
 export default function NewStudentModal({ onClose, demo }) {
   const { profile } = useAuth();
   const { stages, labels } = useAcademicStages();
+  const { academicYear: liveYear } = useAcademicYearLabel();
   const [nameFirst, setNameFirst] = useState('');
   const [nameFather, setNameFather] = useState('');
   const [nameGrandfather, setNameGrandfather] = useState('');
@@ -29,7 +31,7 @@ export default function NewStudentModal({ onClose, demo }) {
   const [stageId, setStageId] = useState('');
   const [classSection, setClassSection] = useState(SECTION_OPTIONS[0]);
   const [ageYears, setAgeYears] = useState('');
-  const [academicYear, setAcademicYear] = useState(CURRENT_ACADEMIC_YEAR);
+  const [academicYear, setAcademicYear] = useState(liveYear);
   const [shift, setShift] = useState('صباحي');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -38,6 +40,9 @@ export default function NewStudentModal({ onClose, demo }) {
     if (!stageId && stages[0]) setStageId(stages[0].id);
   }, [stages, stageId]);
 
+  useEffect(() => {
+    setAcademicYear(liveYear);
+  }, [liveYear]);
   const selectedStage = stages.find((s) => s.id === stageId) || stages[0];
   const stageLabel = selectedStage?.labelAr || labels[0] || '';
 

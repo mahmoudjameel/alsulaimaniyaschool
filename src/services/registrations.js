@@ -1,5 +1,6 @@
 import { addDoc, serverTimestamp } from 'firebase/firestore';
-import { composeFullName, CURRENT_ACADEMIC_YEAR, formatGradeLabel } from '../lib/constants';
+import { composeFullName, formatGradeLabel } from '../lib/constants';
+import { resolveAcademicYear } from '../lib/liveAcademicYear';
 import { admissionsCol } from './admissions';
 
 /**
@@ -19,6 +20,7 @@ export async function submitRegistration(form) {
   const name = composeFullName({ nameFirst, nameFather, nameGrandfather, nameFamily })
     || (studentName || '').trim();
   const stage = stageLabel || form.grade || '';
+  const year = await resolveAcademicYear(academicYear);
   const grade = formatGradeLabel(stage, classSection) || stage;
 
   await addDoc(admissionsCol, {
@@ -41,7 +43,7 @@ export async function submitRegistration(form) {
     stageLabel: stage,
     classSection: classSection || null,
     ageYears: ageYears != null && ageYears !== '' ? Number(ageYears) : null,
-    academicYear: academicYear || CURRENT_ACADEMIC_YEAR,
+    academicYear: year,
     grade,
     contactMethod,
     notes: notes || '',

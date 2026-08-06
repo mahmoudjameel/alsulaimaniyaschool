@@ -2,6 +2,7 @@ import { addDoc, collection, doc, serverTimestamp, setDoc, updateDoc } from 'fir
 import { db } from '../firebase/config';
 import { logActivity } from './activity';
 import { createNotification } from './notifications';
+import { assertTermOpen, fetchAcademicCalendar } from './academicCalendar';
 
 export const gradeEntriesCol = collection(db, 'gradeEntries');
 
@@ -54,6 +55,8 @@ export async function submitGrade({
   classId, className, subject, studentId, studentName, teacherId, teacherName,
   assessmentTitle, score, maxScore, term, assessmentType,
 }) {
+  await assertTermOpen(term);
+  const cal = await fetchAcademicCalendar();
   const ref = await addDoc(gradeEntriesCol, {
     classId, className, subject, studentId, studentName, teacherId, teacherName,
     assessmentTitle,
@@ -61,6 +64,7 @@ export async function submitGrade({
     score: Number(score),
     maxScore: Number(maxScore),
     term: term || '',
+    academicYear: cal.academicYear || '',
     status: 'قيد المراجعة',
     createdAt: serverTimestamp(),
   });

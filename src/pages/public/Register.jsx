@@ -3,31 +3,37 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import PhoneWhatsAppField from '../../components/PhoneWhatsAppField';
 import {
-  CURRENT_ACADEMIC_YEAR, GUARDIAN_WORK_STATUS_OPTIONS, HOUSING_TYPE_OPTIONS, SECTION_OPTIONS,
+  GUARDIAN_WORK_STATUS_OPTIONS, HOUSING_TYPE_OPTIONS, SECTION_OPTIONS,
 } from '../../lib/constants';
 import { isValidLocalMobile, normalizeLocalMobile, toE164Display, toWhatsAppNumber } from '../../lib/phone';
 import { useAcademicStages } from '../../hooks/useAcademicStages';
+import { useAcademicYearLabel } from '../../components/AcademicYearText';
 import { submitRegistration } from '../../services/registrations';
 
 const CONTACT_METHODS = ['واتساب', 'اتصال هاتفي', 'بريد إلكتروني'];
 
-const emptyForm = (stageId = '', stageLabel = '') => ({
+const emptyForm = (stageId = '', stageLabel = '', academicYear = '') => ({
   guardianName: '', phoneDial: '970', phoneLocal: '',
   residentialAddress: '', guardianWorkStatus: GUARDIAN_WORK_STATUS_OPTIONS[0], housingType: HOUSING_TYPE_OPTIONS[0],
   nameFirst: '', nameFather: '', nameGrandfather: '', nameFamily: '',
   nationalId: '', ageYears: '',
   stageId, stageLabel, classSection: SECTION_OPTIONS[0],
-  academicYear: CURRENT_ACADEMIC_YEAR,
+  academicYear,
   contactMethod: CONTACT_METHODS[0], notes: '', consent: true,
 });
 
 export default function Register() {
   const navigate = useNavigate();
   const { stages } = useAcademicStages();
+  const { academicYear: liveYear } = useAcademicYearLabel();
   const [registered, setRegistered] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [form, setForm] = useState(emptyForm());
+  const [form, setForm] = useState(() => emptyForm('', '', liveYear));
+
+  useEffect(() => {
+    setForm((prev) => (prev.academicYear ? prev : { ...prev, academicYear: liveYear }));
+  }, [liveYear]);
 
   useEffect(() => {
     if (stages[0] && !form.stageId) {
@@ -81,7 +87,7 @@ export default function Register() {
   };
 
   const reset = () => {
-    setForm(emptyForm(stages[0]?.id, stages[0]?.labelAr));
+    setForm(emptyForm(stages[0]?.id, stages[0]?.labelAr, liveYear));
     setRegistered(false);
   };
 

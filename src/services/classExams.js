@@ -2,6 +2,7 @@ import { addDoc, collection, doc, serverTimestamp, updateDoc } from 'firebase/fi
 import { db } from '../firebase/config';
 import { logActivity } from './activity';
 import { notifyMany } from './notifications';
+import { assertTermOpen, fetchAcademicCalendar } from './academicCalendar';
 
 export const classExamsCol = collection(db, 'classExams');
 
@@ -9,6 +10,8 @@ export async function submitClassExam({
   classId, className, subject, teacherId, teacherName,
   title, examDate, startTime, endTime, notes, grade, term,
 }) {
+  await assertTermOpen(term);
+  const cal = await fetchAcademicCalendar();
   const ref = await addDoc(classExamsCol, {
     classId,
     className: className || '',
@@ -22,6 +25,7 @@ export async function submitClassExam({
     notes: (notes || '').trim() || null,
     grade: grade || null,
     term: term || null,
+    academicYear: cal.academicYear || '',
     status: 'قيد المراجعة',
     createdAt: serverTimestamp(),
   });

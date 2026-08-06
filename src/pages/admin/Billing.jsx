@@ -9,7 +9,8 @@ import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { useAcademicStages } from '../../hooks/useAcademicStages';
 import { demoBilling, demoStudents } from '../../data/demo';
 import { generateInvoices } from '../../services/finance';
-import { CURRENT_ACADEMIC_YEAR, formatILS } from '../../lib/constants';
+import { formatILS } from '../../lib/constants';
+import { useAcademicYearLabel } from '../../components/AcademicYearText';
 import { currentPeriod, periodLabel } from '../../lib/staff';
 import {
   filterAndSortCharges,
@@ -23,6 +24,7 @@ export default function Billing() {
   const { data: charges, error, demo } = useLiveOrDemo('charges', [orderBy('createdAt', 'desc')], demoBilling.charges);
   const { data: students } = useLiveOrDemo('students', [orderBy('name', 'asc')], demoStudents);
   const { stages, labels: stageLabels } = useAcademicStages();
+  const { academicYear } = useAcademicYearLabel();
   const [period, setPeriod] = useState(currentPeriod());
   const [generating, setGenerating] = useState(false);
   const [genMessage, setGenMessage] = useState('');
@@ -158,7 +160,7 @@ export default function Billing() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <Icon name="verified_user" size={18} color="var(--color-accent-800)" />
           <div style={{ fontSize: 13, color: 'var(--color-accent-900)' }}>
-            التوليد <strong>غير مكرَّر</strong> لكل طالب/شهر. العام الدراسي الحالي: {CURRENT_ACADEMIC_YEAR}.
+            التوليد <strong>غير مكرَّر</strong> لكل طالب/شهر. العام الدراسي الحالي: {academicYear}.
           </div>
         </div>
       </div>

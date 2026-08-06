@@ -13,9 +13,10 @@ import { filterByStudentSearch, matchesStudentSearch } from '../../lib/studentSe
 import { SCHOOL_NAME_AR } from '../../lib/constants';
 import { TEACHER_GRADE_TEMPLATE } from '../../lib/phone';
 import { openGuardianWhatsApp } from '../../lib/teacherWhatsApp';
+import TermSelect, { useDefaultActiveTerm } from '../../components/TermSelect';
+import { isTermClosed } from '../../services/academicCalendar';
 
 const STATUS_TONE = { 'قيد المراجعة': 'outline', 'معتمد': 'accent', 'مرفوض': 'neutral' };
-const TERMS = ['الفصل الأول', 'الفصل الثاني', ''];
 
 export default function Grades() {
   const { profile } = useAuth();
@@ -53,7 +54,8 @@ export default function Grades() {
   const [studentId, setStudentId] = useState('');
   const [assessmentType, setAssessmentType] = useState(ASSESSMENT_TYPES[0]);
   const [assessmentTitle, setAssessmentTitle] = useState('');
-  const [term, setTerm] = useState(TERMS[0]);
+  const [term, setTerm] = useState('');
+  const calendar = useDefaultActiveTerm(setTerm);
   const [score, setScore] = useState('');
   const [maxScore, setMaxScore] = useState(String(defaultMaxForType(ASSESSMENT_TYPES[0])));
   const [submitting, setSubmitting] = useState(false);
@@ -108,8 +110,12 @@ export default function Grades() {
         setScore('');
         setStudentId('');
       }
-    } catch {
-      setMessage('تعذّر إرسال الدرجة.');
+    } catch (err) {
+      if (err?.code === 'TERM_CLOSED' || err?.message === 'TERM_CLOSED') {
+        setMessage(`الفصل «${term || err.term || ''}» مقفل من الإدارة — لا يُقبل إدخال درجات جديدة عليه.`);
+      } else {
+        setMessage('تعذّر إرسال الدرجة.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -165,13 +171,14 @@ export default function Grades() {
             </div>
             <div className="field">
               <label>الفصل</label>
-              <select className="input" value={term} onChange={(e) => setTerm(e.target.value)}>
-                <option value={TERMS[0]}>{TERMS[0]}</option>
-                <option value={TERMS[1]}>{TERMS[1]}</option>
-                <option value="">غير محدد</option>
-              </select>
+              <TermSelect value={term} onChange={setTerm} allowEmpty emptyLabel="غير محدد" />
             </div>
           </div>
+          {isTermClosed(calendar, term) && (
+            <div style={{ marginTop: 10, fontSize: 13, color: 'var(--color-accent-2-700)' }}>
+              هذا الفصل مقفل من الإدارة — لا يمكن إدخال درجات عليه.
+            </div>
+          )}
           <div className="field" style={{ marginTop: 10 }}>
             <label>عنوان إضافي (اختياري)</label>
             <input

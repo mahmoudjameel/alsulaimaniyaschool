@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import Icon from '../components/Icon';
 import { useAuth } from '../context/AuthContext';
+import { useAcademicCalendar } from '../hooks/useAcademicCalendar';
 import { CURRENT_ACADEMIC_YEAR } from '../lib/constants';
 
 const NAV_GROUPS = [
@@ -44,6 +45,7 @@ const NAV_GROUPS = [
       { to: '/admin/enrollment', label: 'تسجيل الطلاب في الصفوف', icon: 'person_add', permission: 'enrollment.manage' },
       { to: '/admin/teachers', label: 'دليل المعلّمين', icon: 'co_present', permission: 'teachers.manage' },
       { to: '/admin/grades', label: 'الدرجات', icon: 'grade', permission: 'grades.approve' },
+      { to: '/admin/academic-year', label: 'العام الدراسي والترحيل', icon: 'event', permission: 'students.manage' },
       { to: '/admin/staff-hub', label: 'طلبات المعلّمين والاختبارات', icon: 'handshake', permission: 'classes.manage' },
       { to: '/admin/cms', label: 'الموقع والمحتوى', icon: 'newspaper', permission: 'cms.manage' },
     ],
@@ -79,6 +81,7 @@ const TITLES = {
   '/admin/enrollment': 'تسجيل الطلاب في الصفوف',
   '/admin/teachers': 'دليل المعلّمين',
   '/admin/grades': 'الدرجات',
+  '/admin/academic-year': 'العام الدراسي والترحيل',
   '/admin/cms': 'الموقع والمحتوى',
   '/admin/users': 'المستخدمون والصلاحيات',
   '/admin/backup': 'نسخ احتياطي ومسح',
@@ -89,7 +92,9 @@ export default function AdminLayout() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { profile, signOut, can, isFirebaseConfigured } = useAuth();
+  const { calendar } = useAcademicCalendar();
   const [menuOpen, setMenuOpen] = useState(false);
+  const yearLabel = calendar?.academicYear || CURRENT_ACADEMIC_YEAR;
 
   useEffect(() => { setMenuOpen(false); }, [pathname]);
   useEffect(() => {
@@ -174,7 +179,7 @@ export default function AdminLayout() {
           </button>
           <h3 className="panel-page-title">{title}</h3>
           <div className="panel-topbar-actions">
-            <span className="tag tag-neutral ah-hide-sm">العام الدراسي {CURRENT_ACADEMIC_YEAR}</span>
+            <span className="tag tag-neutral ah-hide-sm">العام الدراسي {yearLabel}</span>
           </div>
         </header>
         <div className="panel-content">
