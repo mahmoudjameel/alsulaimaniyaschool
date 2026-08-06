@@ -19,7 +19,8 @@ export const STUDENT_AUTH_EMAIL_DOMAIN = 'students.sulaimaniya.local';
 export const studentIdToAuthEmail = (studentId) =>
   `${studentId.trim().toLowerCase().replace(/[^a-z0-9-]/g, '')}@${STUDENT_AUTH_EMAIL_DOMAIN}`;
 
-export const ROLES = ['admin', 'teacher', 'accountant', 'reception', 'parent', 'student'];
+export const ROLES = ['admin', 'director', 'teacher', 'accountant', 'reception', 'parent', 'student'];
+
 
 /** Temporarily hide parent + student portals from launcher/login. Set true to restore. */
 export const SHOW_FAMILY_PORTALS = false;

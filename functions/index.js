@@ -408,7 +408,11 @@ const ROLE_DEFAULT_PERMISSIONS = {
     'admissions.manage': true, 'students.manage': true, 'stages.manage': true, 'enrollment.manage': true,
     'billing.manage': true, 'payments.manage': true, 'payroll.manage': true, 'staff.manage': true,
     'disbursements.manage': true, 'expenses.manage': true, 'classes.manage': true, 'teachers.manage': true,
-    'grades.approve': true, 'cms.manage': true, 'users.manage': true, 'activity.view': true,
+    'grades.approve': true, 'cms.manage': true, 'users.manage': true, 'system.backup': true, 'activity.view': true,
+  },
+  director: {
+    'admissions.manage': true, 'students.manage': true, 'stages.manage': true, 'enrollment.manage': true,
+    'classes.manage': true, 'teachers.manage': true, 'grades.approve': true, 'cms.manage': true, 'activity.view': true,
   },
   accountant: {
     'billing.manage': true, 'payments.manage': true, 'expenses.manage': true, 'enrollment.manage': true,
@@ -425,7 +429,9 @@ export const createStaffAccount = onCall(async (request) => {
   const { uid: actorUid, user: actor } = await requirePermission(request, 'users.manage');
   const { email, name, role, title, childStudentIds, password } = request.data || {};
   if (!email || !name || !role) throw new HttpsError('invalid-argument', 'الاسم والبريد والدور مطلوبة.');
-  if (!['admin', 'teacher', 'accountant', 'parent', 'reception'].includes(role)) throw new HttpsError('invalid-argument', 'دور غير معروف.');
+  if (!['admin', 'director', 'teacher', 'accountant', 'parent', 'reception'].includes(role)) {
+    throw new HttpsError('invalid-argument', 'دور غير معروف.');
+  }
 
   const chosen = typeof password === 'string' ? password.trim() : '';
   if (chosen && chosen.length < 6) {
@@ -434,18 +440,28 @@ export const createStaffAccount = onCall(async (request) => {
   const tempPassword = chosen || randomTempPassword();
   const authUser = await auth.createUser({ email, password: tempPassword, displayName: name });
 
+  const defaultTitle = role === 'director' ? 'مديرة'
+    : role === 'teacher' ? 'معلّم'
+      : role === 'accountant' ? 'محاسب'
+        : role === 'reception' ? 'استقبال'
+          : '';
+
   const batch = db.batch();
   batch.set(db.collection('users').doc(authUser.uid), {
-    role, name, title: title || '', email, permissions: ROLE_DEFAULT_PERMISSIONS[role] || {},
+    role,
+    name,
+    title: title || defaultTitle,
+    email,
+    permissions: ROLE_DEFAULT_PERMISSIONS[role] || {},
     createdAt: FieldValue.serverTimestamp(),
   });
   if (role === 'teacher' || role === 'accountant' || role === 'reception') {
     const roleType = role === 'teacher' ? 'teacher' : role === 'accountant' ? 'accountant' : 'reception';
-    const defaultTitle = role === 'teacher' ? 'معلّم' : role === 'accountant' ? 'محاسب' : 'استقبال';
+    const staffTitle = title || defaultTitle;
     batch.set(db.collection('staff').doc(authUser.uid), {
       name,
-      role: title || defaultTitle,
-      jobTitleAr: title || defaultTitle,
+      role: staffTitle,
+      jobTitleAr: staffTitle,
       roleType,
       salaryType: 'monthly',
       type: 'راتب شهري',

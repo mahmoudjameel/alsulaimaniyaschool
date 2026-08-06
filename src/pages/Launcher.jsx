@@ -18,6 +18,13 @@ const STAFF_PORTALS = [
     icon: 'admin_panel_settings',
   },
   {
+    id: 'director',
+    title: 'المديرة',
+    desc: 'لوحة الإدارة بصلاحيات مخصّصة للشاشات',
+    to: '/login/director',
+    icon: 'manage_accounts',
+  },
+  {
     id: 'teacher',
     title: 'المعلّم',
     desc: 'الدروس · الاختبارات · الحضور · الملاحظات',

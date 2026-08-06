@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import RequireRole from './components/RequireRole';
+import RequirePermission from './components/RequirePermission';
 
 import Launcher from './pages/Launcher';
 import Login from './pages/Login';
@@ -116,7 +117,7 @@ export default function App() {
           <Route path="/" element={<Launcher />} />
           <Route path="/login/:role" element={<Login />} />
 
-          <Route path="/admin" element={<RequireRole role="admin"><AdminLayout /></RequireRole>}>
+          <Route path="/admin" element={<RequireRole role={['admin', 'director']}><AdminLayout /></RequireRole>}>
             <Route index element={<Dashboard />} />
             <Route path="admissions" element={<Admissions />} />
             <Route path="students" element={<Students />} />
@@ -144,11 +145,11 @@ export default function App() {
             <Route path="staff-hub" element={<AdminStaffHub />} />
             <Route path="enrollment" element={<Enrollment />} />
             <Route path="cms" element={<Cms />} />
-            <Route path="users" element={<Users />} />
-            <Route path="backup" element={<SystemBackup />} />
+            <Route path="users" element={<RequirePermission permission="users.manage"><Users /></RequirePermission>} />
+            <Route path="backup" element={<RequirePermission permission="system.backup"><SystemBackup /></RequirePermission>} />
             <Route path="activity" element={<ActivityLog />} />
           </Route>
-          <Route path="/admin/students/:id/report-card" element={<RequireRole role="admin"><ReportCard /></RequireRole>} />
+          <Route path="/admin/students/:id/report-card" element={<RequireRole role={['admin', 'director']}><ReportCard /></RequireRole>} />
 
           <Route path="/teacher" element={<RequireRole role="teacher"><TeacherLayout /></RequireRole>}>
             <Route index element={<TeacherDashboard />} />

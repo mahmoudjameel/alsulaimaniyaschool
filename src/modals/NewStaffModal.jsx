@@ -9,7 +9,7 @@ export default function NewStaffModal({ onClose, demo }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('accountant');
+  const [role, setRole] = useState('director');
   const [title, setTitle] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -73,7 +73,14 @@ export default function NewStaffModal({ onClose, demo }) {
             {STAFF_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
           </select>
         </Field>
-        <Field label="المسمّى الوظيفي"><input className="input" placeholder="مثال: مسؤولة مالية" value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
+        <Field label="المسمّى الوظيفي">
+          <input
+            className="input"
+            placeholder={role === 'director' ? 'مثال: مديرة المدرسة' : 'مثال: مسؤولة مالية'}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </Field>
       </div>
     </Modal>
   );

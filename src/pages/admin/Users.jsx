@@ -44,7 +44,9 @@ export default function Users() {
       <div className="card" style={{ gap: 8, background: 'var(--color-accent-100)', borderColor: 'color-mix(in srgb, var(--gold) 35%, transparent)' }}>
         <div style={{ fontFamily: 'var(--font-heading)', fontSize: 17, fontWeight: 700 }}>الصلاحيات المخصّصة</div>
         <p style={{ margin: 0, fontSize: 13, lineHeight: 1.75, color: 'var(--color-neutral-700)' }}>
-          كل دور له صلاحيات افتراضية. من «تعديل الصلاحيات» يمكنك منح أقسام إضافية (مثل المراحل أو الموظفين لمحاسب) أو إلغاء صلاحية افتراضية لشخص معيّن.
+          كل دور له صلاحيات افتراضية وشاشات ظاهرة في القائمة.
+          دور <strong>المديرة</strong> يدخل لوحة الإدارة بصلاحيات طلاب/أكاديمي افتراضياً (بدون مالية كاملة وبدون مستخدمين أو نسخ احتياطي).
+          من «تعديل الصلاحيات» فعّلي أو ألغِ أي شاشة لكل شخص.
         </p>
       </div>
 
@@ -71,7 +73,7 @@ export default function Users() {
             {!error && data.length === 0 && (
               <tr>
                 <td colSpan={5} style={{ textAlign: 'center', color: 'var(--color-neutral-500)', padding: 28 }}>
-                  لا يوجد مستخدمون بعد — ادعُ معلّماً أو محاسباً من الزر أعلاه.
+                  لا يوجد مستخدمون بعد — ادعُ مديرة أو معلّماً أو محاسباً من الزر أعلاه.
                 </td>
               </tr>
             )}

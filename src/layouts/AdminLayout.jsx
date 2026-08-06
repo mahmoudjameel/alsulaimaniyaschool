@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import Icon from '../components/Icon';
 import { useAuth } from '../context/AuthContext';
 import { useAcademicCalendar } from '../hooks/useAcademicCalendar';
 import { CURRENT_ACADEMIC_YEAR } from '../lib/constants';
+import { ROLE_LABELS } from '../lib/permissions';
 
-const NAV_GROUPS = [
+export const ADMIN_NAV_GROUPS = [
   {
     label: 'عام',
     items: [
@@ -54,7 +55,7 @@ const NAV_GROUPS = [
     label: 'النظام',
     items: [
       { to: '/admin/users', label: 'المستخدمون والصلاحيات', icon: 'admin_panel_settings', permission: 'users.manage' },
-      { to: '/admin/backup', label: 'نسخ احتياطي ومسح', icon: 'settings_backup_restore', permission: null },
+      { to: '/admin/backup', label: 'نسخ احتياطي ومسح', icon: 'settings_backup_restore', permission: 'system.backup' },
       { to: '/admin/activity', label: 'سجلّ الحركات', icon: 'history', permission: 'activity.view' },
     ],
   },
@@ -86,7 +87,35 @@ const TITLES = {
   '/admin/users': 'المستخدمون والصلاحيات',
   '/admin/backup': 'نسخ احتياطي ومسح',
   '/admin/activity': 'سجلّ الحركات',
+  '/admin/staff-hub': 'طلبات المعلّمين والاختبارات',
 };
+
+/** Longest-prefix match for nested routes (e.g. /admin/students/xyz). */
+export function adminPermissionForPath(pathname) {
+  const items = ADMIN_NAV_GROUPS.flatMap((g) => g.items);
+  let best = null;
+  for (const item of items) {
+    if (item.to === '/admin') {
+      if (pathname === '/admin' || pathname === '/admin/') best = item;
+      continue;
+    }
+    if (pathname === item.to || pathname.startsWith(`${item.to}/`)) {
+      if (!best || item.to.length > best.to.length) best = item;
+    }
+  }
+  return best?.permission || null;
+}
+
+function AdminOutletGuard() {
+  const { pathname } = useLocation();
+  const { can, isFirebaseConfigured } = useAuth();
+  if (!isFirebaseConfigured) return <Outlet />;
+  const perm = adminPermissionForPath(pathname);
+  if (perm && !can(perm)) {
+    return <Navigate to="/admin" replace />;
+  }
+  return <Outlet />;
+}
 
 export default function AdminLayout() {
   const { pathname } = useLocation();
@@ -107,7 +136,7 @@ export default function AdminLayout() {
     : pathname.startsWith('/admin/teachers/') ? 'ملف المعلّم'
     : (TITLES[pathname] || 'لوحة القيادة');
 
-  const groups = useMemo(() => NAV_GROUPS.map((g) => ({
+  const groups = useMemo(() => ADMIN_NAV_GROUPS.map((g) => ({
     ...g,
     items: g.items.filter((item) => {
       if (!item.permission) return true;
@@ -115,6 +144,9 @@ export default function AdminLayout() {
       return can(item.permission);
     }),
   })).filter((g) => g.items.length > 0), [can, isFirebaseConfigured]);
+
+  const roleLabel = ROLE_LABELS[profile?.role] || profile?.role || 'إدارة';
+  const displayTitle = profile?.title || roleLabel;
 
   const nav = (
     <>
@@ -139,10 +171,10 @@ export default function AdminLayout() {
         ))}
       </nav>
       <div className="panel-user">
-        <div className="panel-user-avatar">{(profile?.name || 'مدير').charAt(0)}</div>
+        <div className="panel-user-avatar">{(profile?.name || 'م').charAt(0)}</div>
         <div className="panel-user-meta">
-          <div className="panel-user-name">{profile?.name || 'مدير عام'}</div>
-          <div className="panel-user-title">{profile?.title || 'مدير عام'}</div>
+          <div className="panel-user-name">{profile?.name || 'مستخدم'}</div>
+          <div className="panel-user-title">{displayTitle}</div>
         </div>
         <button type="button" className="btn btn-icon btn-ghost" title="تسجيل الخروج" onClick={() => signOut()}>
           <Icon name="logout" size={16} />
@@ -179,11 +211,12 @@ export default function AdminLayout() {
           </button>
           <h3 className="panel-page-title">{title}</h3>
           <div className="panel-topbar-actions">
+            <span className="tag tag-outline ah-hide-sm">{roleLabel}</span>
             <span className="tag tag-neutral ah-hide-sm">العام الدراسي {yearLabel}</span>
           </div>
         </header>
         <div className="panel-content">
-          <Outlet />
+          <AdminOutletGuard />
         </div>
       </main>
     </div>

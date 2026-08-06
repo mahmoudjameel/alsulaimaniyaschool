@@ -18,10 +18,11 @@ service cloud.firestore {
     }
     function myRole() { return isSignedIn() ? myUser().role : null; }
     function isAdmin() { return myRole() == 'admin'; }
+    function isDirector() { return myRole() == 'director'; }
     function isTeacher() { return myRole() == 'teacher'; }
     function isAccountant() { return myRole() == 'accountant'; }
     function isReception() { return myRole() == 'reception'; }
-    function isStaff() { return isAdmin() || isTeacher() || isAccountant() || isReception(); }
+    function isStaff() { return isAdmin() || isDirector() || isTeacher() || isAccountant() || isReception(); }
     function hasPerm(key) {
       return isAdmin() || (isSignedIn() && myUser().permissions != null && myUser().permissions[key] == true);
     }

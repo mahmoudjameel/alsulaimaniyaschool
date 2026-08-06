@@ -11,6 +11,7 @@ import { isValidLocalMobile, toE164Display } from '../lib/phone';
 
 const ALL_ROLE_TABS = [
   { id: 'admin', label: 'الإدارة', icon: 'dashboard' },
+  { id: 'director', label: 'المديرة', icon: 'manage_accounts' },
   { id: 'teacher', label: 'المعلّم', icon: 'co_present' },
   { id: 'accountant', label: 'المحاسب', icon: 'point_of_sale' },
   { id: 'reception', label: 'الاستقبال', icon: 'desk' },
@@ -20,10 +21,11 @@ const ALL_ROLE_TABS = [
 
 const ROLE_TABS = ALL_ROLE_TABS.filter((r) => SHOW_FAMILY_PORTALS || !r.family);
 
-const STAFF_ROLES = new Set(['admin', 'teacher', 'accountant', 'reception']);
+const STAFF_ROLES = new Set(['admin', 'director', 'teacher', 'accountant', 'reception']);
 
 const META = {
   admin: { title: 'لوحة الإدارة', sub: 'دخول حساب الإدارة', ph: `admin@${SCHOOL_EMAIL_DOMAIN}`, idLabel: 'البريد الإلكتروني', hint: 'يتطلّب كلمة مرور' },
+  director: { title: 'دخول المديرة', sub: 'لوحة الإدارة بصلاحيات مخصّصة', ph: `director@${SCHOOL_EMAIL_DOMAIN}`, idLabel: 'البريد الإلكتروني', hint: 'يتطلّب كلمة مرور' },
   teacher: { title: 'دخول المعلّم', sub: 'صفوفك والحضور والدرجات', ph: `teacher@${SCHOOL_EMAIL_DOMAIN}`, idLabel: 'البريد الإلكتروني', hint: 'يتطلّب كلمة مرور' },
   accountant: { title: 'دخول المحاسب', sub: 'الفواتير والمدفوعات والرواتب', ph: `accountant@${SCHOOL_EMAIL_DOMAIN}`, idLabel: 'البريد الإلكتروني', hint: 'يتطلّب كلمة مرور' },
   reception: { title: 'دخول الاستقبال', sub: 'القبول وملفات الطلاب', ph: `reception@${SCHOOL_EMAIL_DOMAIN}`, idLabel: 'البريد الإلكتروني', hint: 'يتطلّب كلمة مرور' },
@@ -31,10 +33,23 @@ const META = {
   student: { title: 'دخول الطالب', sub: 'بالرقم الدراسي فقط', ph: '1227', idLabel: 'الرقم الدراسي', hint: 'بدون كلمة مرور' },
 };
 
-const DEST = { admin: '/admin', teacher: '/teacher', accountant: '/accountant', reception: '/reception', parent: '/parent', student: '/student' };
+const DEST = {
+  admin: '/admin',
+  director: '/admin',
+  teacher: '/teacher',
+  accountant: '/accountant',
+  reception: '/reception',
+  parent: '/parent',
+  student: '/student',
+};
 const SIGN_IN_FN = {
-  admin: 'signInAdmin', teacher: 'signInTeacher', accountant: 'signInAccountant',
-  reception: 'signInReception', parent: 'signInParent', student: 'signInStudent',
+  admin: 'signInAdmin',
+  director: 'signInAdmin',
+  teacher: 'signInTeacher',
+  accountant: 'signInAccountant',
+  reception: 'signInReception',
+  parent: 'signInParent',
+  student: 'signInStudent',
 };
 
 export default function Login() {

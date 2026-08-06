@@ -16,10 +16,15 @@ export default function EditPermissionsModal({ user, onClose, demo }) {
   const groups = permissionGroups();
   const defaults = ROLE_DEFAULT_PERMISSIONS[role] || {};
   const toggle = (key) => setPerms((p) => ({ ...p, [key]: !p[key] }));
+  const isFullAdmin = role === 'admin';
 
   const onRoleChange = (nextRole) => {
     setRole(nextRole);
-    setPerms(permissionsForUser({ ...user, role: nextRole, permissions: ROLE_DEFAULT_PERMISSIONS[nextRole] || {} }));
+    setPerms(permissionsForUser({
+      ...user,
+      role: nextRole,
+      permissions: ROLE_DEFAULT_PERMISSIONS[nextRole] || {},
+    }));
   };
 
   const resetDefaults = () => {
@@ -38,7 +43,7 @@ export default function EditPermissionsModal({ user, onClose, demo }) {
     try {
       await updateUserAccess(user.id, {
         role,
-        permissions: role === 'admin' ? {} : serializePermissions(perms),
+        permissions: isFullAdmin ? {} : serializePermissions(perms),
       });
       onClose();
     } catch {
@@ -58,10 +63,18 @@ export default function EditPermissionsModal({ user, onClose, demo }) {
         </select>
       </Field>
 
-      {role === 'admin' ? (
-        <div className="dialog-body">حساب الإدارة يملك كل الصلاحيات دائماً ولا يمكن تقييده.</div>
+      {isFullAdmin ? (
+        <div className="dialog-body">
+          حساب <strong>الإدارة</strong> يملك كل الصلاحيات دائماً ولا يمكن تقييده.
+          لتعيين صلاحيات محدودة استخدمي دور <strong>المديرة</strong> ثم فعّلي الشاشات أدناه.
+        </div>
       ) : (
         <>
+          {role === 'director' && (
+            <div className="dialog-body" style={{ marginBottom: 8 }}>
+              دور المديرة يدخل لوحة الإدارة. الافتراضي: طلاب وأكاديمي بدون مالية كاملة وبدون مستخدمين/نسخ احتياطي — عدّلي حسب الحاجة.
+            </div>
+          )}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 4 }}>
             <span style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>{grantedCount} من {PERMISSIONS.length} صلاحية مفعّلة</span>
             <span style={{ marginInlineStart: 'auto' }} />
@@ -69,7 +82,7 @@ export default function EditPermissionsModal({ user, onClose, demo }) {
             <button type="button" className="btn btn-secondary" style={{ fontSize: 12 }} onClick={grantAll}>منح الكل</button>
           </div>
           <div className="dialog-body" style={{ marginBottom: 4 }}>
-            الافتراضي يظهر بعلامة «افتراضي». يمكنك إضافة أقسام إضافية أو إلغاء صلاحية افتراضية حسب الحاجة.
+            كل مربع يفتح شاشة أو إجراء في النظام. الافتراضي يظهر بعلامة «افتراضي».
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '50vh', overflow: 'auto', paddingInlineEnd: 4 }}>
             {groups.map((g) => (

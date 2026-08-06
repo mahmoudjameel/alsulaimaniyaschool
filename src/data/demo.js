@@ -491,6 +491,24 @@ export const schoolStats = { students: 842, teachers: 36, years: 18 };
 
 export const demoStaffUsers = [
   { id: 'u-fatima', name: 'فاطمة (المالكة)', role: 'admin', title: 'مدير عام', email: 'admin@sulaimaniya.ps', permissions: {} },
+  {
+    id: 'u-director',
+    name: 'أ. سمر النجار',
+    role: 'director',
+    title: 'مديرة المدرسة',
+    email: 'director@sulaimaniya.ps',
+    permissions: {
+      'admissions.manage': true,
+      'students.manage': true,
+      'stages.manage': true,
+      'enrollment.manage': true,
+      'classes.manage': true,
+      'teachers.manage': true,
+      'grades.approve': true,
+      'cms.manage': true,
+      'activity.view': true,
+    },
+  },
   { id: 'u-khaled', name: 'أ. خالد الأحمد', role: 'teacher', title: 'معلّم لغة عربية', email: 'khaled@sulaimaniya.ps', permissions: { 'classes.manage': true } },
   { id: 'u-rana', name: 'أ. رنا عادل', role: 'teacher', title: 'معلّمة رياضيات', email: 'rana@sulaimaniya.ps', permissions: { 'classes.manage': true } },
   { id: 'u-layla', name: 'ليلى حسن', role: 'accountant', title: 'مسؤولة مالية', email: 'layla@sulaimaniya.ps', permissions: { 'billing.manage': true, 'payments.manage': true, 'expenses.manage': true, 'enrollment.manage': true, 'students.manage': true, 'payroll.manage': true, 'disbursements.manage': true } },
