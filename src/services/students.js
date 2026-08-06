@@ -22,7 +22,7 @@ export async function createStudent(payload = {}) {
     guardianPhoneKey,
     residentialAddress, guardianWorkStatus, housingType,
     nationalId, academicYear, stageId, stageLabel, classSection,
-    ageYears, grade, shift,
+    ageYears, birthDate, grade, shift,
   } = payload;
 
   const name = (nameOverride || composeFullName({
@@ -50,6 +50,7 @@ export async function createStudent(payload = {}) {
     stageId: stageId || null,
     stageLabel: stage,
     classSection: classSection || null,
+    birthDate: (birthDate || '').trim() || null,
     ageYears: ageYears != null && ageYears !== '' ? Number(ageYears) : null,
     displayId: `STU-${nextNumber}`,
     guardianName: guardianName || '—',
@@ -189,6 +190,7 @@ export function parseStudentsCsv(text) {
       stageLabel: get('stage', 'المرحلة'),
       classSection: get('section', 'الشعبة'),
       ageYears: get('age', 'العمر'),
+      birthDate: get('birthdate', 'dateofbirth', 'تاريخ الميلاد'),
       academicYear: get('academicyear', 'السنة الدراسية'),
       shift: get('shift', 'الفترة'),
     };

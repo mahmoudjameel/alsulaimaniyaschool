@@ -22,8 +22,8 @@ export const studentIdToAuthEmail = (studentId) =>
 export const ROLES = ['admin', 'director', 'teacher', 'accountant', 'reception', 'parent', 'student'];
 
 
-/** Temporarily hide parent + student portals from launcher/login. Set true to restore. */
-export const SHOW_FAMILY_PORTALS = false;
+/** Show parent + student portals on launcher/login. */
+export const SHOW_FAMILY_PORTALS = true;
 
 export const GRADE_OPTIONS = [
   'الروضة', 'التمهيدي', 'الأول الأساسي', 'الثاني الأساسي', 'الثالث الأساسي',

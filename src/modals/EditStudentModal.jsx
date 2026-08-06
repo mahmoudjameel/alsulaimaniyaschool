@@ -7,6 +7,7 @@ import {
   GUARDIAN_WORK_STATUS_OPTIONS, HOUSING_TYPE_OPTIONS, SECTION_OPTIONS,
 } from '../lib/constants';
 import { isValidLocalMobile, normalizeLocalMobile, parseStoredPhone, phoneKeyFromLocal, toE164Display, toWhatsAppNumber } from '../lib/phone';
+import { ageFromBirthDate, birthDateBounds, isPlausibleStudentBirthDate } from '../lib/birthDate';
 import { useAcademicStages } from '../hooks/useAcademicStages';
 import { useAcademicYearLabel } from '../components/AcademicYearText';
 import { updateStudent } from '../services/students';
@@ -14,6 +15,7 @@ import { logActivity } from '../services/activity';
 import { useAuth } from '../context/AuthContext';
 
 const STATUS_OPTIONS = ['نشط', 'موقوف', 'متخرّج', 'منسحب'];
+const BIRTH_BOUNDS = birthDateBounds();
 
 export default function EditStudentModal({ student, onClose, demo }) {
   const { profile } = useAuth();
@@ -36,7 +38,7 @@ export default function EditStudentModal({ student, onClose, demo }) {
   const [housingType, setHousingType] = useState(student.housingType || HOUSING_TYPE_OPTIONS[0]);
   const [stageId, setStageId] = useState(student.stageId || '');
   const [classSection, setClassSection] = useState(student.classSection || SECTION_OPTIONS[0]);
-  const [ageYears, setAgeYears] = useState(student.ageYears ?? '');
+  const [birthDate, setBirthDate] = useState(student.birthDate || '');
   const [academicYear, setAcademicYear] = useState(student.academicYear || liveYear);
   const [shift, setShift] = useState(student.shift || 'صباحي');
   const [status, setStatus] = useState(student.status || 'نشط');
@@ -70,6 +72,10 @@ export default function EditStudentModal({ student, onClose, demo }) {
     if (!nationalId.trim()) { setError('رقم الهوية مطلوب.'); return; }
     if (!isValidLocalMobile(phoneLocal)) { setError('رقم واتساب ولي الأمر غير صالح.'); return; }
     if (!residentialAddress.trim()) { setError('عنوان السكن مطلوب.'); return; }
+    if (birthDate && !isPlausibleStudentBirthDate(birthDate)) {
+      setError('تاريخ الميلاد غير منطقي لطالب (3–20 سنة).');
+      return;
+    }
     if (demo) { setError('وضع العرض التوضيحي: صِل مشروع Firebase لحفظ التعديلات فعلياً.'); return; }
 
     const phoneE164 = toE164Display(phoneDial, phoneLocal);
@@ -78,6 +84,7 @@ export default function EditStudentModal({ student, onClose, demo }) {
     setError('');
     try {
       const gradeLabel = formatGradeLabel(stageLabel, classSection) || stageLabel;
+      const ageYears = birthDate ? ageFromBirthDate(birthDate) : null;
       await updateStudent(student.id, {
         name: fullName,
         nameFirst: nameFirst.trim() || null,
@@ -98,7 +105,8 @@ export default function EditStudentModal({ student, onClose, demo }) {
         stageId: selectedStage?.id || stageId || null,
         stageLabel,
         classSection: classSection || null,
-        ageYears: ageYears !== '' ? Number(ageYears) : null,
+        birthDate: birthDate || null,
+        ageYears,
         academicYear: academicYear || liveYear,
         grade: gradeLabel,
         shift,
@@ -135,8 +143,22 @@ export default function EditStudentModal({ student, onClose, demo }) {
         <Field label="رقم الهوية">
           <input className="input" value={nationalId} onChange={(e) => setNationalId(e.target.value)} required dir="ltr" style={{ textAlign: 'right' }} />
         </Field>
-        <Field label="العمر (سنوات)">
-          <input className="input" type="number" min="3" max="20" value={ageYears} onChange={(e) => setAgeYears(e.target.value)} dir="ltr" style={{ textAlign: 'right' }} />
+        <Field label="تاريخ الميلاد">
+          <input
+            className="input"
+            type="date"
+            value={birthDate}
+            onChange={(e) => setBirthDate(e.target.value)}
+            min={BIRTH_BOUNDS.min}
+            max={BIRTH_BOUNDS.max}
+            dir="ltr"
+            style={{ textAlign: 'right' }}
+          />
+          {ageFromBirthDate(birthDate) != null && (
+            <div style={{ fontSize: 11, color: 'var(--color-neutral-500)', marginTop: 4 }}>
+              العمر: {ageFromBirthDate(birthDate)} سنة
+            </div>
+          )}
         </Field>
       </div>
       <Field label="ولي الأمر"><input className="input" value={guardianName} onChange={(e) => setGuardianName(e.target.value)} required /></Field>

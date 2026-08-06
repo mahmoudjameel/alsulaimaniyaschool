@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDocOrDemo, useLiveOrDemo } from '../../hooks/useFirestore';
 import { demoStudents, demoStudentDetail, demoAttendanceRecords } from '../../data/demo';
 import { formatILS, SCHOOL_NAME_AR } from '../../lib/constants';
+import { formatBirthDateDisplay } from '../../lib/birthDate';
 import { relativeDaysAr, relativeFromTimestamp } from '../../lib/relativeTime';
 import { computeAttendanceRate, computeMonthlyAttendance } from '../../lib/attendance';
 import EditStudentModal from '../../modals/EditStudentModal';
@@ -67,6 +68,7 @@ export default function StudentProfile() {
             <span>الرقم: {student.displayId}</span>
             <span>الصف: {student.grade}</span>
             {student.nationalId && <span>الهوية: {student.nationalId}</span>}
+            {student.birthDate && <span>الميلاد: {formatBirthDateDisplay(student.birthDate)}</span>}
             {(student.ageYears || detail?.age) && <span>العمر: {student.ageYears || detail?.age}</span>}
             {student.academicYear && <span>العام: {student.academicYear}</span>}
             {detail?.joinedDate && <span>تاريخ الالتحاق: {detail.joinedDate}</span>}

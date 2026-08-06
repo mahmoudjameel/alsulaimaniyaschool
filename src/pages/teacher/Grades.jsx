@@ -113,6 +113,8 @@ export default function Grades() {
     } catch (err) {
       if (err?.code === 'TERM_CLOSED' || err?.message === 'TERM_CLOSED') {
         setMessage(`الفصل «${term || err.term || ''}» مقفل من الإدارة — لا يُقبل إدخال درجات جديدة عليه.`);
+      } else if (err?.code === 'TERM_REQUIRED' || err?.message === 'TERM_REQUIRED') {
+        setMessage('اختري الفصل الدراسي قبل إرسال الدرجة.');
       } else {
         setMessage('تعذّر إرسال الدرجة.');
       }
@@ -171,7 +173,7 @@ export default function Grades() {
             </div>
             <div className="field">
               <label>الفصل</label>
-              <TermSelect value={term} onChange={setTerm} allowEmpty emptyLabel="غير محدد" />
+              <TermSelect value={term} onChange={setTerm} />
             </div>
           </div>
           {isTermClosed(calendar, term) && (

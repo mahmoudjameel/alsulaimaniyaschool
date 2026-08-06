@@ -437,6 +437,18 @@ export async function reviewAbsenceExcuse(excuseId, { decision, reviewer }) {
     link: data.studentId ? `/teacher/students/${data.studentId}` : '/teacher/inbox',
   });
 
+  if (data.guardianUid) {
+    await notifyMany([data.guardianUid], {
+      role: 'parent',
+      type: 'absence_excuse',
+      title: decision === 'approve' ? 'قُبل تبرير الغياب' : 'رُفض تبرير الغياب',
+      body: `${data.studentName || 'طالب'} — ${data.date}`,
+      studentId: data.studentId,
+      studentName: data.studentName,
+      link: '/parent/absence',
+    });
+  }
+
   // On approve: mark matching attendance rows as excused so parent/student portals match
   if (decision === 'approve' && data.studentId && data.date) {
     const recSnap = await getDocs(query(

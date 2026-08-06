@@ -13,7 +13,7 @@ export async function submitRegistration(form) {
     guardianName, phone, phoneDial, phoneLocal, phoneE164, phoneWa,
     residentialAddress, guardianWorkStatus, housingType,
     nameFirst, nameFather, nameGrandfather, nameFamily,
-    studentName, nationalId, stageId, stageLabel, classSection, ageYears,
+    studentName, nationalId, stageId, stageLabel, classSection, ageYears, birthDate,
     academicYear, contactMethod, notes,
   } = form;
 
@@ -42,6 +42,7 @@ export async function submitRegistration(form) {
     stageId: stageId || null,
     stageLabel: stage,
     classSection: classSection || null,
+    birthDate: (birthDate || '').trim() || null,
     ageYears: ageYears != null && ageYears !== '' ? Number(ageYears) : null,
     academicYear: year,
     grade,

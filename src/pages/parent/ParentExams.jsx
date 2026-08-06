@@ -15,8 +15,10 @@ export function ApprovedExamsList({ classIds, demo }) {
 
   const list = useMemo(() => {
     const set = new Set(classIds || []);
+    // Empty enrollment → show nothing (do not dump the whole school calendar)
+    if (set.size === 0) return [];
     return (exams || [])
-      .filter((e) => set.size === 0 || set.has(e.classId))
+      .filter((e) => set.has(e.classId))
       .sort((a, b) => String(a.examDate).localeCompare(String(b.examDate)));
   }, [exams, classIds]);
 

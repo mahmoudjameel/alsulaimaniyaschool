@@ -100,6 +100,8 @@ export default function TeacherBulkGrades() {
     } catch (err) {
       if (err?.code === 'TERM_CLOSED' || err?.message === 'TERM_CLOSED') {
         setMessage(`الفصل «${term || err.term || ''}» مقفل من الإدارة — لا يُقبل إدخال درجات جديدة عليه.`);
+      } else if (err?.code === 'TERM_REQUIRED' || err?.message === 'TERM_REQUIRED') {
+        setMessage('اختري الفصل الدراسي قبل إرسال الدرجات.');
       } else {
         setMessage('تعذّر إرسال بعض الدرجات.');
       }
@@ -138,7 +140,7 @@ export default function TeacherBulkGrades() {
           </div>
           <div className="field">
             <label>الفصل</label>
-            <TermSelect value={term} onChange={setTerm} allowEmpty emptyLabel="غير محدد" />
+            <TermSelect value={term} onChange={setTerm} />
           </div>
           <div className="field">
             <label>من أصل</label>

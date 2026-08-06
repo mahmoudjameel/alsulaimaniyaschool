@@ -49,8 +49,10 @@ async function requireAdmin(request) {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'يجب تسجيل الدخول.');
   const user = (await db().collection('users').doc(uid).get()).data();
-  if (user?.role !== 'admin') {
-    throw new HttpsError('permission-denied', 'هذه العملية للإدارة فقط.');
+  // Full admin always; others need system.backup explicitly true (director default excludes it).
+  const canBackup = user?.role === 'admin' || user?.permissions?.['system.backup'] === true;
+  if (!canBackup) {
+    throw new HttpsError('permission-denied', 'هذه العملية لمن يملك صلاحية النسخ الاحتياطي.');
   }
   return { uid, user };
 }

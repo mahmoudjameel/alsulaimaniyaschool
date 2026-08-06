@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import { useAuth } from '../context/AuthContext';
 import { SCHOOL_NAME_AR } from '../lib/constants';
+import { useAcademicYearLabel } from '../components/AcademicYearText';
 
 const PRIMARY_NAV = [
   { to: '/parent', end: true, label: 'الرئيسية', icon: 'home' },
@@ -24,6 +25,7 @@ const MORE_NAV = [
 export default function ParentLayout() {
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
+  const { academicYear } = useAcademicYearLabel();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef(null);
   const name = profile?.name || 'ولي الأمر';
@@ -54,7 +56,7 @@ export default function ParentLayout() {
             <img src="/assets/logo-mark.png" alt="" className="stu-logo" />
             <div className="stu-brand-text">
               <div className="stu-brand-name">{SCHOOL_NAME_AR}</div>
-              <div className="stu-brand-sub">بوابة ولي الأمر</div>
+              <div className="stu-brand-sub">بوابة ولي الأمر · {academicYear}</div>
             </div>
           </div>
 

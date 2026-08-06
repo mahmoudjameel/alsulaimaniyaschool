@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { where } from 'firebase/firestore';
-import Icon from '../../components/Icon';
 import { ErrorBanner } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useClassDayLogsMap } from '../../hooks/useClassDayLogsMap';
@@ -13,6 +12,12 @@ import { isHomeworkLesson } from '../../services/studentPortal';
 import { homeworkSubmissionId, markHomeworkSubmitted } from '../../services/homework';
 import { demoStudentClasses } from '../../data/demo';
 
+const FILTERS = [
+  { id: 'open', label: 'مطلوب' },
+  { id: 'done', label: 'تم التسليم' },
+  { id: 'all', label: 'الكل' },
+];
+
 export default function StudentHomework() {
   const { profile } = useAuth();
   const { enrolled, demo, error, studentId, student } = useMyStudent();
@@ -22,6 +27,7 @@ export default function StudentHomework() {
   const classDocs = useClassDocsMap(demo ? [] : classIds);
   const [busyId, setBusyId] = useState(null);
   const [localDone, setLocalDone] = useState({});
+  const [filter, setFilter] = useState('open');
 
   const { data: submissions } = useLiveOrDemo(
     'homeworkSubmissions',
@@ -44,14 +50,14 @@ export default function StudentHomework() {
         {
           id: 'hw-demo-0',
           submissionId: 'demo',
-          title: `واجب: ${demoStudentClasses[0]?.next || 'تمارين'}`,
+          title: demoStudentClasses[0]?.next || 'تمارين',
           className: demoStudentClasses[0]?.title,
           subject: demoStudentClasses[0]?.subject,
           status: 'مطلوب',
-          source: 'دفتر اليوم',
           dueDate: null,
           classId: 'demo',
           teacherId: null,
+          sort: Date.now(),
         },
       ];
     }
@@ -75,8 +81,6 @@ export default function StudentHomework() {
             classId,
             teacherId: l.teacherId || doc?.teacherId || null,
             status: submittedMap[sid] ? 'تم التسليم' : 'مطلوب',
-            source: 'دفتر اليوم',
-            summary: l.topic ? `موضوع الحصة: ${l.topic}` : (l.notice || ''),
             dueDate: date || null,
             teacher: l.teacherName || doc?.teacher || meta?.teacher || '',
             sort: Date.parse(date || '') || 0,
@@ -98,8 +102,6 @@ export default function StudentHomework() {
             subject: doc?.subject || meta?.subject || '',
             classId,
             status: 'مطلوب',
-            source: 'درس',
-            summary: l.summary || l.whatTaught || l.notes || '',
             dueDate: l.dueDate || null,
             teacher: l.authorName || doc?.teacher || meta?.teacher || '',
             sort: Date.parse(l.dueDate || '') || (l.createdAt?.toMillis?.() || 0),
@@ -109,6 +111,12 @@ export default function StudentHomework() {
 
     return rows.sort((a, b) => b.sort - a.sort);
   }, [demo, dayLogsByClass, lessonsByClass, classDocs, enrolled, studentId, submittedMap]);
+
+  const view = useMemo(() => {
+    if (filter === 'open') return homework.filter((h) => h.status !== 'تم التسليم');
+    if (filter === 'done') return homework.filter((h) => h.status === 'تم التسليم');
+    return homework;
+  }, [homework, filter]);
 
   const markDone = async (hw) => {
     if (!hw.submissionId || hw.submissionId === 'demo' || demo || !studentId) return;
@@ -137,48 +145,62 @@ export default function StudentHomework() {
   return (
     <div className="stu-page">
       <ErrorBanner>{error && 'تعذّر تحميل الواجبات.'}</ErrorBanner>
+
       <header className="stu-page-head">
         <h1 className="stu-page-title">واجباتي</h1>
-        <p className="stu-page-lead">واجبات من دفتر اليوم ومن دروس المعلّم — يمكنك تعليم «تمّ التسليم».</p>
+        <p className="stu-page-lead">الأحدث أولاً</p>
       </header>
 
-      {homework.length === 0 && (
-        <div className="card stu-empty-card">
-          <Icon name="task" size={28} color="var(--gold)" />
-          <p>لا واجبات معلّمة حالياً.</p>
-          <Link to="/student/today" className="btn btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>يومك الدراسي</Link>
-        </div>
-      )}
+      <div className="stu-filter" role="tablist" aria-label="حالة الواجب">
+        {FILTERS.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            role="tab"
+            aria-selected={filter === f.id}
+            className={`stu-filter-btn${filter === f.id ? ' is-on' : ''}`}
+            onClick={() => setFilter(f.id)}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
 
-      {homework.map((hw) => (
-        <div key={hw.id} className="card stu-hw-row">
-          <div className="stu-class-icon"><Icon name="assignment" size={18} /></div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="stu-class-name">{hw.title}</div>
-            <div className="stu-class-meta">
-              {[hw.subject, hw.className, hw.teacher, hw.source].filter(Boolean).join(' · ')}
-            </div>
-            {hw.dueDate && <div className="stu-class-meta" style={{ marginTop: 2 }}>التاريخ: {hw.dueDate}</div>}
-            {hw.summary && <div className="stu-class-meta" style={{ marginTop: 4 }}>{hw.summary}</div>}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
-            <span className={`tag tag-${hw.status === 'تم التسليم' ? 'accent' : 'outline'}`}>{hw.status}</span>
-            {hw.submissionId && hw.status !== 'تم التسليم' && (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ fontSize: 11 }}
-                disabled={busyId === hw.id}
-                onClick={() => markDone(hw)}
-              >
-                تمّ التسليم
-              </button>
-            )}
-          </div>
+      {view.length === 0 ? (
+        <div className="stu-empty-block">
+          <p>{filter === 'done' ? 'ما في واجبات مسلّمة.' : 'ما في واجبات مطلوبة.'}</p>
+          <Link to="/student/today" className="stu-section-link">شوف يومك</Link>
         </div>
-      ))}
-      {!demo && studentId && classIds.length === 0 && (
-        <p className="stu-class-meta">لا صفوف مسجّلة بعد.</p>
+      ) : (
+        <div className="stu-list">
+          {view.map((hw) => (
+            <div key={hw.id} className="stu-hw-card">
+              <div className="stu-hw-body">
+                <div className="stu-list-title">{hw.title}</div>
+                <div className="stu-list-sub">
+                  {[hw.subject, hw.className, hw.teacher].filter(Boolean).join(' · ')}
+                </div>
+                {hw.dueDate && <div className="stu-list-sub">التاريخ: {hw.dueDate}</div>}
+              </div>
+              <div className="stu-hw-actions">
+                <span className={`stu-status stu-status--${hw.status === 'تم التسليم' ? 'ok' : 'warn'}`}>
+                  {hw.status}
+                </span>
+                {hw.submissionId && hw.status !== 'تم التسليم' && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: 12 }}
+                    disabled={busyId === hw.id}
+                    onClick={() => markDone(hw)}
+                  >
+                    تمّ التسليم
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

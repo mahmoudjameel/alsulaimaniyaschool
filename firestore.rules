@@ -23,8 +23,30 @@ service cloud.firestore {
     function isAccountant() { return myRole() == 'accountant'; }
     function isReception() { return myRole() == 'reception'; }
     function isStaff() { return isAdmin() || isDirector() || isTeacher() || isAccountant() || isReception(); }
+    // Mirrors src/lib/permissions.js ROLE_DEFAULT_PERMISSIONS (kept in sync by hand).
+    function roleDefaultPerm(key) {
+      let r = myRole();
+      return (r == 'director' && (
+          key == 'admissions.manage' || key == 'students.manage' || key == 'stages.manage'
+          || key == 'enrollment.manage' || key == 'classes.manage' || key == 'teachers.manage'
+          || key == 'grades.approve' || key == 'cms.manage' || key == 'activity.view'
+        ))
+        || (r == 'teacher' && key == 'classes.manage')
+        || (r == 'accountant' && (
+          key == 'billing.manage' || key == 'payments.manage' || key == 'expenses.manage'
+          || key == 'enrollment.manage' || key == 'students.manage' || key == 'payroll.manage'
+          || key == 'disbursements.manage' || key == 'staff.manage'
+        ))
+        || (r == 'reception' && (
+          key == 'admissions.manage' || key == 'students.manage' || key == 'enrollment.manage'
+        ));
+    }
+    // Stored true grants; stored false revokes a role default; unset falls back to role default.
     function hasPerm(key) {
-      return isAdmin() || (isSignedIn() && myUser().permissions != null && myUser().permissions[key] == true);
+      return isAdmin()
+        || (isSignedIn() && myUser().permissions != null && myUser().permissions[key] == true)
+        || (isSignedIn() && roleDefaultPerm(key)
+          && !(myUser().permissions != null && myUser().permissions[key] == false));
     }
 
     // Everything not explicitly opened below is closed by default.
@@ -152,10 +174,24 @@ service cloud.firestore {
       }
     }
 
-    // School GPS center + geofence for teacher punch
+    // School GPS + academic calendar (schoolSettings/main)
     match /schoolSettings/{id} {
       allow read: if isSignedIn();
-      allow create, update: if isAdmin() || hasPerm('staff.manage');
+      allow create: if isAdmin()
+        || hasPerm('staff.manage')
+        || hasPerm('students.manage')
+        || hasPerm('stages.manage');
+      // Calendar fields: admin / students / stages. Geofence-only: staff.manage.
+      allow update: if isAdmin()
+        || hasPerm('students.manage')
+        || hasPerm('stages.manage')
+        || (hasPerm('staff.manage')
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly([
+              'nameAr', 'locationLabelAr', 'latitude', 'longitude', 'radiusMeters',
+              'punchEnabled', 'workdayStart', 'workdayEnd', 'notes',
+              'updatedAt', 'updatedBy', 'updatedByName'
+            ]));
       allow delete: if isAdmin();
     }
 
@@ -188,16 +224,20 @@ service cloud.firestore {
     match /feeTemplates/{grade} { allow read, write: if hasPerm('billing.manage'); }
 
     match /studentDiscounts/{id} {
-      allow read, create: if hasPerm('billing.manage');
+      allow read: if hasPerm('billing.manage')
+        || (isSignedIn() && chargeBelongsToCaller(resource.data));
+      allow create: if hasPerm('billing.manage');
       allow update, delete: if isAdmin();
     }
     match /installmentPlans/{id} {
-      allow read, create: if hasPerm('billing.manage');
-      allow update: if hasPerm('billing.manage');
+      allow read: if hasPerm('billing.manage')
+        || (isSignedIn() && chargeBelongsToCaller(resource.data));
+      allow create, update: if hasPerm('billing.manage');
     }
     match /installments/{id} {
-      allow read, create: if hasPerm('billing.manage');
-      allow update: if hasPerm('billing.manage');
+      allow read: if hasPerm('billing.manage')
+        || (isSignedIn() && chargeBelongsToCaller(resource.data));
+      allow create, update: if hasPerm('billing.manage');
     }
     match /absenceExcuses/{id} {
       allow create: if isSignedIn()

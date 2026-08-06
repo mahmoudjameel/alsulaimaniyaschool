@@ -9,7 +9,7 @@ import { useDocOrDemo, useLiveOrDemo } from '../hooks/useFirestore';
 import { demoStudents, demoGradeEntries, demoAttendanceRecords } from '../data/demo';
 import { useAcademicYearLabel } from '../components/AcademicYearText';
 import { computeAttendanceRate } from '../lib/attendance';
-import { scoreToBand } from '../services/grades';
+import { filterByAcademicYear, scoreToBand } from '../services/grades';
 
 import { studentProfilePath } from '../lib/portalPaths';
 
@@ -19,15 +19,20 @@ export default function ReportCard() {
   const { academicYear } = useAcademicYearLabel();
 
   const { data: student, error } = useDocOrDemo(`students/${id}`, demoStudents.find((s) => s.id === id) || null);
-  const { data: grades } = useLiveOrDemo(
+  const { data: gradesRaw } = useLiveOrDemo(
     'gradeEntries',
-    [where('studentId', '==', id), where('status', '==', 'معتمد')],
+    [where('studentId', '==', id)],
     demoGradeEntries.filter((g) => g.studentId === id && g.status === 'معتمد')
   );
   const { data: attendance } = useLiveOrDemo(
     `students/${id}/attendanceRecords`,
     [orderBy('date', 'asc')],
     demoAttendanceRecords[id] || []
+  );
+
+  const grades = useMemo(
+    () => filterByAcademicYear((gradesRaw || []).filter((g) => g.status === 'معتمد'), academicYear),
+    [gradesRaw, academicYear],
   );
 
   const bySubject = useMemo(() => {

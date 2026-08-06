@@ -3,28 +3,32 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import { useAuth } from '../context/AuthContext';
 import { SCHOOL_NAME_AR } from '../lib/constants';
+import { useAcademicYearLabel } from '../components/AcademicYearText';
 
+/** الشريط الأساسي — أهم ما يحتاجه الطالب يومياً */
 const PRIMARY_NAV = [
   { to: '/student', end: true, label: 'الرئيسية', icon: 'home' },
   { to: '/student/today', label: 'اليوم', icon: 'today' },
-  { to: '/student/classes', label: 'صفوفي', icon: 'menu_book' },
-  { to: '/student/inbox', label: 'تنبيهات', icon: 'notifications' },
+  { to: '/student/grades', label: 'درجاتي', icon: 'grade' },
+  { to: '/student/homework', label: 'واجبات', icon: 'assignment' },
 ];
 
+/** الباقي تحت «المزيد» — مرتّب حسب الاستخدام */
 const MORE_NAV = [
-  { to: '/student/grades', label: 'الدرجات', icon: 'grade' },
+  { to: '/student/classes', label: 'صفوفي', icon: 'menu_book' },
   { to: '/student/attendance', label: 'الحضور', icon: 'event_available' },
-  { to: '/student/homework', label: 'الواجبات', icon: 'assignment' },
   { to: '/student/exams', label: 'الاختبارات', icon: 'event' },
-  { to: '/student/achievements', label: 'تقدّمي', icon: 'emoji_events' },
-  { to: '/student/fees', label: 'المستحقات', icon: 'payments' },
+  { to: '/student/inbox', label: 'التنبيهات', icon: 'notifications' },
   { to: '/student/announcements', label: 'الإعلانات', icon: 'campaign' },
   { to: '/student/notes', label: 'ملاحظات', icon: 'chat' },
+  { to: '/student/fees', label: 'المستحقات', icon: 'payments' },
+  { to: '/student/achievements', label: 'تقدّمي', icon: 'emoji_events' },
 ];
 
 export default function StudentLayout() {
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
+  const { academicYear } = useAcademicYearLabel();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef(null);
   const name = profile?.name || 'الطالب';
@@ -55,7 +59,7 @@ export default function StudentLayout() {
             <img src="/assets/logo-mark.png" alt="" className="stu-logo" />
             <div className="stu-brand-text">
               <div className="stu-brand-name">{SCHOOL_NAME_AR}</div>
-              <div className="stu-brand-sub">بوابة الطالب</div>
+              <div className="stu-brand-sub">{academicYear}</div>
             </div>
           </div>
 

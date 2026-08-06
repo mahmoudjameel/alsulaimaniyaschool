@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "seed": "node scripts/seed.mjs",
+    "seed:family": "node scripts/seed-parent-family.mjs",
     "emulators": "firebase emulators:start"
   },
   "dependencies": {

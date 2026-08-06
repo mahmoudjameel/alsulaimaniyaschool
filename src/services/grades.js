@@ -1,7 +1,7 @@
-import { addDoc, collection, doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { logActivity } from './activity';
-import { createNotification } from './notifications';
+import { createNotification, notifyMany } from './notifications';
 import { assertTermOpen, fetchAcademicCalendar } from './academicCalendar';
 
 export const gradeEntriesCol = collection(db, 'gradeEntries');
@@ -49,6 +49,17 @@ export function assessmentTypeLabel(type) {
   if (type === 'حضور') return 'درجة الحضور';
   if (type === 'نشاط') return 'درجة النشاط';
   return type || 'تقييم';
+}
+
+/** Keep rows for the live academic year; legacy rows without academicYear stay visible. */
+export function matchesAcademicYear(row, academicYear) {
+  if (!academicYear) return true;
+  if (!row?.academicYear) return true;
+  return row.academicYear === academicYear;
+}
+
+export function filterByAcademicYear(rows, academicYear) {
+  return (rows || []).filter((r) => matchesAcademicYear(r, academicYear));
 }
 
 export async function submitGrade({
@@ -101,6 +112,37 @@ export async function approveGrade(entry, decidedBy) {
       classId: entry.classId,
       link: `/teacher/students/${entry.studentId}`,
     });
+  }
+  // Fan-out to parent + student portals
+  try {
+    const stuSnap = await getDoc(doc(db, 'students', entry.studentId));
+    const stu = stuSnap.exists() ? stuSnap.data() : {};
+    const body = `«${entry.assessmentTitle}» — ${entry.score}/${entry.maxScore}${entry.subject ? ` · ${entry.subject}` : ''}`;
+    await notifyMany([stu.guardianUid].filter(Boolean), {
+      role: 'parent',
+      type: 'grade_approved',
+      title: `درجة معتمدة — ${entry.studentName || 'طالب'}`,
+      body,
+      studentId: entry.studentId,
+      studentName: entry.studentName,
+      classId: entry.classId,
+      link: '/parent/grades',
+    });
+    if (stu.studentUid) {
+      await createNotification({
+        userId: stu.studentUid,
+        role: 'student',
+        type: 'grade_approved',
+        title: 'درجة جديدة معتمدة',
+        body,
+        studentId: entry.studentId,
+        studentName: entry.studentName,
+        classId: entry.classId,
+        link: '/student/grades',
+      });
+    }
+  } catch {
+    // Non-fatal: grade is already approved
   }
 }
 

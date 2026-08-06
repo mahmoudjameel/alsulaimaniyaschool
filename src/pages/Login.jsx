@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
 import Icon from '../components/Icon';
 import PhoneWhatsAppField from '../components/PhoneWhatsAppField';
 import { useAuth } from '../context/AuthContext';
+import { auth as firebaseAuth, db } from '../firebase/config';
 import {
   SCHOOL_EMAIL_DOMAIN, SCHOOL_LOCATION_AR, SCHOOL_NAME_AR, SCHOOL_NAME_EN, SCHOOL_TYPE_AR,
   SHOW_FAMILY_PORTALS,
@@ -42,6 +44,18 @@ const DEST = {
   parent: '/parent',
   student: '/student',
 };
+
+/** Tab role → accepted profile roles (admin shell shares admin/director). */
+const TAB_ALLOWED_ROLES = {
+  admin: ['admin', 'director'],
+  director: ['admin', 'director'],
+  teacher: ['teacher'],
+  accountant: ['accountant'],
+  reception: ['reception'],
+  parent: ['parent'],
+  student: ['student'],
+};
+
 const SIGN_IN_FN = {
   admin: 'signInAdmin',
   director: 'signInAdmin',
@@ -109,7 +123,21 @@ export default function Login() {
     setSubmitting(true);
     try {
       await auth[SIGN_IN_FN[role]](identifier, password, remember);
-      navigate(DEST[role]);
+      if (auth.isFirebaseConfigured) {
+        const uid = firebaseAuth.currentUser?.uid;
+        if (!uid) throw new Error('no-user');
+        const snap = await getDoc(doc(db, 'users', uid));
+        const actualRole = snap.exists() ? snap.data()?.role : null;
+        const allowed = TAB_ALLOWED_ROLES[role] || [role];
+        if (!actualRole || !allowed.includes(actualRole)) {
+          await auth.signOut();
+          setError('هذا الحساب لا ينتمي لهذا المدخل. اختري الواجهة المناسبة لدورك.');
+          return;
+        }
+        navigate(DEST[actualRole] || DEST[role]);
+      } else {
+        navigate(DEST[role]);
+      }
     } catch (err) {
       setError(mapAuthError(err, role));
     } finally {
@@ -168,7 +196,7 @@ export default function Login() {
           <Icon name="arrow_forward" size={15} /> كل الواجهات
         </Link>
         <div style={{ width: '100%', maxWidth: 400, margin: '0 auto' }}>
-          <div className="seg ah-roletabs" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 28 }}>
+          <div className="seg ah-roletabs" style={{ display: 'grid', gridTemplateColumns: `repeat(${ROLE_TABS.length},minmax(0,1fr))`, marginBottom: 28 }}>
             {ROLE_TABS.map((r) => (
               <button
                 key={r.id}

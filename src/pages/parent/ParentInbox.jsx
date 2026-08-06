@@ -37,19 +37,37 @@ export default function ParentInbox() {
   const id1 = children[1]?.id;
   const { data: notes0 } = useLiveOrDemo(
     id0 ? `students/${id0}/notes` : 'students/__none__/notes',
-    [orderBy('createdAt', 'desc')],
+    [where('visibleToParent', '==', true), orderBy('createdAt', 'desc')],
     ((demoStudentDetail[id0] || demoStudentDetail.s1)?.notes || []).map((n, i) => ({ id: `n0-${i}`, ...n, visibleToParent: true })),
     id0 || '__none__',
   );
   const { data: notes1 } = useLiveOrDemo(
     id1 ? `students/${id1}/notes` : 'students/__none__/notes',
-    [orderBy('createdAt', 'desc')],
+    [where('visibleToParent', '==', true), orderBy('createdAt', 'desc')],
     ((demoStudentDetail[id1] || {})?.notes || []).map((n, i) => ({ id: `n1-${i}`, ...n, visibleToParent: true })),
     id1 || '__none__',
   );
 
+  const { data: pushNotes } = useLiveOrDemo(
+    'notifications',
+    [where('userId', '==', profile?.id || '__none__'), orderBy('createdAt', 'desc')],
+    [],
+    profile?.id || '__none__',
+  );
+
   const items = useMemo(() => {
     const rows = [];
+    (pushNotes || []).slice(0, 15).forEach((n) => {
+      rows.push({
+        id: `n-${n.id}`,
+        icon: n.type?.includes('exam') ? 'event' : n.type?.includes('grade') ? 'grade' : n.type?.includes('absence') ? 'event_busy' : 'notifications',
+        title: n.title || 'تنبيه',
+        meta: n.body || '',
+        at: n.createdAt,
+        to: n.link || '/parent/inbox',
+        sort: n.createdAt?.toMillis?.() || 0,
+      });
+    });
     (announcements || []).slice(0, 8).forEach((a) => {
       rows.push({
         id: `a-${a.id}`,
@@ -99,15 +117,15 @@ export default function ParentInbox() {
     noteChild(notes0, children[0]?.name);
     noteChild(notes1, children[1]?.name);
     rows.sort((a, b) => b.sort - a.sort);
-    return rows.slice(0, 30);
-  }, [announcements, proofs, excuses, notes0, notes1, children]);
+    return rows.slice(0, 40);
+  }, [announcements, proofs, excuses, notes0, notes1, children, pushNotes]);
 
   return (
     <div className="stu-page">
       <ErrorBanner>{error && 'تعذّر تحميل التنبيهات.'}</ErrorBanner>
       <header className="stu-page-head">
         <h1 className="stu-page-title">التنبيهات</h1>
-        <p className="stu-page-lead">إعلانات، وصول دفع، تبريرات غياب، وملاحظات المعلّمين.</p>
+        <p className="stu-page-lead">إشعارات النظام، إعلانات، وصول دفع، تبريرات غياب، وملاحظات المعلّمين.</p>
       </header>
 
       {items.length === 0 && (

@@ -82,7 +82,11 @@ export default function Launcher() {
 
         <section className="launch-hero" aria-labelledby="launch-brand">
           <h1 id="launch-brand" className="launch-brand">{SCHOOL_NAME_AR}</h1>
-          <p className="launch-lead">دخول الموظفين إلى نظام إدارة المدرسة</p>
+          <p className="launch-lead">
+            {SHOW_FAMILY_PORTALS
+              ? 'دخول الموظفين وأولياء الأمور والطلاب إلى نظام المدرسة'
+              : 'دخول الموظفين إلى نظام إدارة المدرسة'}
+          </p>
         </section>
 
         <section className="launch-section" aria-labelledby="launch-staff">

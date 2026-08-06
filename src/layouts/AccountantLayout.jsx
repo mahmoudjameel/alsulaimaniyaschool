@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import Icon from '../components/Icon';
 import { useAuth } from '../context/AuthContext';
@@ -34,6 +34,29 @@ const TITLES = {
   '/accountant/expenses': 'المصاريف',
   '/accountant/enrollment': 'تسجيل بالصفوف',
 };
+
+function accountantPermissionForPath(pathname) {
+  let best = null;
+  for (const item of NAV) {
+    if (item.to === '/accountant') {
+      if (pathname === '/accountant' || pathname === '/accountant/') best = item;
+      continue;
+    }
+    if (pathname === item.to || pathname.startsWith(`${item.to}/`)) {
+      if (!best || item.to.length > best.to.length) best = item;
+    }
+  }
+  return best?.permission || null;
+}
+
+function AccountantOutletGuard() {
+  const { pathname } = useLocation();
+  const { can, isFirebaseConfigured } = useAuth();
+  if (!isFirebaseConfigured) return <Outlet />;
+  const perm = accountantPermissionForPath(pathname);
+  if (perm && !can(perm)) return <Navigate to="/accountant" replace />;
+  return <Outlet />;
+}
 
 export default function AccountantLayout() {
   const navigate = useNavigate();
@@ -105,7 +128,7 @@ export default function AccountantLayout() {
           <h3 className="panel-page-title">{pageTitle}</h3>
           <span className="tag tag-neutral ah-hide-sm">العام {academicYear}</span>
         </header>
-        <div className="panel-content"><Outlet /></div>
+        <div className="panel-content"><AccountantOutletGuard /></div>
       </main>
     </div>
   );

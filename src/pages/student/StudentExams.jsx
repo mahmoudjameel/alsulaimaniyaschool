@@ -12,8 +12,8 @@ export default function StudentExams() {
     <div className="stu-page">
       <ErrorBanner>{error && 'تعذّر التحميل.'}</ErrorBanner>
       <header className="stu-page-head">
-        <h1 className="stu-page-title">مواعيد الاختبارات</h1>
-        <p className="stu-page-lead">الاختبارات المعتمدة من الإدارة لصفوفك.</p>
+        <h1 className="stu-page-title">الاختبارات</h1>
+        <p className="stu-page-lead">المواعيد المعتمدة · الأقرب أولاً</p>
       </header>
       <ApprovedExamsList classIds={ids} demo={demo} />
     </div>

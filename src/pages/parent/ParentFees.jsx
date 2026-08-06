@@ -10,6 +10,8 @@ import { formatILS } from '../../lib/constants';
 import { relativeDaysAr, relativeFromTimestamp } from '../../lib/relativeTime';
 import { demoBilling, demoPaymentProofs, demoStudentDetail } from '../../data/demo';
 import SubmitPaymentModal from '../../modals/SubmitPaymentModal';
+import StudentFeeAidPanel from '../../components/StudentFeeAidPanel';
+import { useAcademicYearLabel } from '../../components/AcademicYearText';
 
 const STATUS_TONE = { 'قيد المراجعة': 'outline', 'معتمد': 'accent', 'مرفوض': 'accent2' };
 
@@ -87,6 +89,7 @@ function ChildLedger({ childId }) {
 
 export default function ParentFees() {
   const { profile, children, demo, error } = useMyChildren();
+  const { academicYear } = useAcademicYearLabel();
   const { data: liveProofs } = useLiveOrDemo(
     'paymentProofs',
     [where('guardianUid', '==', profile?.id || '__none__')],
@@ -128,7 +131,9 @@ export default function ParentFees() {
       <ErrorBanner>{error && 'تعذّر تحميل بيانات الرسوم.'}</ErrorBanner>
       <header className="stu-page-head">
         <h1 className="stu-page-title">الرسوم والدفعات</h1>
-        <p className="stu-page-lead">حوّل بنكيًا ثم أرفق صورة الوصل — يُخصم الرصيد بعد اعتماد الإدارة.</p>
+        <p className="stu-page-lead">
+          حوّل بنكيًا ثم أرفق صورة الوصل — يُخصم الرصيد بعد اعتماد الإدارة. العام {academicYear}.
+        </p>
       </header>
 
       <ChildSwitcher children={children} selectedId={activeId} onChange={setSelectedId} />
@@ -176,6 +181,7 @@ export default function ParentFees() {
             )}
 
             <ChildCharges childId={activeChild.id} demo={demo} />
+            <StudentFeeAidPanel studentId={activeChild.id} demo={demo} />
             <ChildLedger childId={activeChild.id} />
 
             {childProofs.length > 0 && (

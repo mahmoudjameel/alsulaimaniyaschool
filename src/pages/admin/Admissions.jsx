@@ -97,7 +97,15 @@ export default function Admissions() {
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.duplicateWarning ? 'var(--color-accent-800)' : 'var(--gold)' }} />
-                    {r.name}
+                    <div>
+                      <div>{r.name}</div>
+                      {(r.birthDate || r.ageYears != null) && (
+                        <div style={{ fontSize: 11, color: 'var(--color-neutral-500)', marginTop: 2 }}>
+                          {r.birthDate ? r.birthDate : ''}{r.birthDate && r.ageYears != null ? ' · ' : ''}
+                          {r.ageYears != null ? `${r.ageYears} سنة` : ''}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </td>
                 <td>

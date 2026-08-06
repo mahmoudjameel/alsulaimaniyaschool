@@ -19,7 +19,7 @@ export default function RequireRole({ role, children }) {
   }
   if (loading) return <Loader label="جارٍ التحقق من الجلسة…" />;
   if (!firebaseUser) return <Navigate to={`/login/${loginRole}`} replace state={{ from: location }} />;
-  if (userRole && !allowed.includes(userRole)) return <Navigate to="/" replace />;
+  if (!userRole || !allowed.includes(userRole)) return <Navigate to="/" replace />;
   return children;
 }
 

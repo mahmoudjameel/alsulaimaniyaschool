@@ -182,18 +182,50 @@ async function linkStudentsToParent(students, parentUid, phoneKey) {
   await batch.commit();
 }
 
+// Kept in sync by hand with src/lib/permissions.js (browser bundle can't be
+// imported here). Source of truth for starting defaults; UI can override.
+// effectivePermission merges these defaults with stored user.permissions.
+const ROLE_DEFAULT_PERMISSIONS = {
+  admin: {
+    'admissions.manage': true, 'students.manage': true, 'stages.manage': true, 'enrollment.manage': true,
+    'billing.manage': true, 'payments.manage': true, 'payroll.manage': true, 'staff.manage': true,
+    'disbursements.manage': true, 'expenses.manage': true, 'classes.manage': true, 'teachers.manage': true,
+    'grades.approve': true, 'cms.manage': true, 'users.manage': true, 'system.backup': true, 'activity.view': true,
+  },
+  director: {
+    'admissions.manage': true, 'students.manage': true, 'stages.manage': true, 'enrollment.manage': true,
+    'classes.manage': true, 'teachers.manage': true, 'grades.approve': true, 'cms.manage': true, 'activity.view': true,
+  },
+  accountant: {
+    'billing.manage': true, 'payments.manage': true, 'expenses.manage': true, 'enrollment.manage': true,
+    'students.manage': true, 'payroll.manage': true, 'disbursements.manage': true, 'staff.manage': true,
+  },
+  teacher: { 'classes.manage': true },
+  reception: {
+    'admissions.manage': true, 'students.manage': true, 'enrollment.manage': true,
+  },
+  parent: {},
+};
+
 /**
- * Two-layer authorization, mirrored from firestore.rules: `role === 'admin'`
- * always passes; otherwise the caller's `users/{uid}.permissions[key]` map
- * (set by an admin from the "المستخدمون والصلاحيات" screen) decides. This
- * keeps a staff member's Cloud Function access consistent with what their
- * granted permissions already let them do directly in Firestore.
+ * Two-layer authorization, mirrored from firestore.rules + src/lib/permissions.js:
+ * `role === 'admin'` always passes; otherwise merge role defaults with the
+ * stored `users/{uid}.permissions` map (stored false revokes a default).
  */
+function effectivePermission(user, key) {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  const defaults = ROLE_DEFAULT_PERMISSIONS[user.role] || {};
+  const stored = user.permissions || {};
+  if (Object.prototype.hasOwnProperty.call(stored, key)) return !!stored[key];
+  return !!defaults[key];
+}
+
 async function requirePermission(request, key) {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'يجب تسجيل الدخول.');
   const user = (await db.collection('users').doc(uid).get()).data();
-  if (user?.role !== 'admin' && !user?.permissions?.[key]) {
+  if (!effectivePermission(user, key)) {
     throw new HttpsError('permission-denied', 'لا تملك صلاحية هذا الإجراء.');
   }
   return { uid, user };
@@ -262,6 +294,7 @@ export const acceptAdmission = onCall(async (request) => {
     stageId: admission.stageId || null,
     stageLabel: admission.stageLabel || admission.grade || 'الأول الأساسي',
     classSection: admission.classSection || null,
+    birthDate: admission.birthDate || null,
     ageYears: admission.ageYears != null ? admission.ageYears : null,
     displayId,
     guardianName: admission.guardian || '—',
@@ -398,32 +431,6 @@ async function issuePortalTokenHandler(request) {
 // ─────────────────────────────────────────────────────────────────────────
 // Staff / parent account provisioning (used by admin onboarding flows)
 // ─────────────────────────────────────────────────────────────────────────
-
-// Kept in sync by hand with src/lib/permissions.js (that file can't be
-// imported here — it's bundled for the browser — so this is the one place
-// the default permission set is duplicated; the admin UI is the source of
-// truth for anything beyond these starting defaults).
-const ROLE_DEFAULT_PERMISSIONS = {
-  admin: {
-    'admissions.manage': true, 'students.manage': true, 'stages.manage': true, 'enrollment.manage': true,
-    'billing.manage': true, 'payments.manage': true, 'payroll.manage': true, 'staff.manage': true,
-    'disbursements.manage': true, 'expenses.manage': true, 'classes.manage': true, 'teachers.manage': true,
-    'grades.approve': true, 'cms.manage': true, 'users.manage': true, 'system.backup': true, 'activity.view': true,
-  },
-  director: {
-    'admissions.manage': true, 'students.manage': true, 'stages.manage': true, 'enrollment.manage': true,
-    'classes.manage': true, 'teachers.manage': true, 'grades.approve': true, 'cms.manage': true, 'activity.view': true,
-  },
-  accountant: {
-    'billing.manage': true, 'payments.manage': true, 'expenses.manage': true, 'enrollment.manage': true,
-    'students.manage': true, 'payroll.manage': true, 'disbursements.manage': true, 'staff.manage': true,
-  },
-  teacher: { 'classes.manage': true },
-  reception: {
-    'admissions.manage': true, 'students.manage': true, 'enrollment.manage': true,
-  },
-  parent: {},
-};
 
 export const createStaffAccount = onCall(async (request) => {
   const { uid: actorUid, user: actor } = await requirePermission(request, 'users.manage');
@@ -710,3 +717,4 @@ export {
   importSystemBackup,
   wipeSystemData,
 } from './backup.js';
+

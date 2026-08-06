@@ -7,11 +7,14 @@ import {
   HOUSING_TYPE_OPTIONS, SECTION_OPTIONS,
 } from '../lib/constants';
 import { isValidLocalMobile, normalizeLocalMobile, phoneKeyFromLocal, toE164Display, toWhatsAppNumber } from '../lib/phone';
+import { ageFromBirthDate, birthDateBounds, isPlausibleStudentBirthDate } from '../lib/birthDate';
 import { useAcademicStages } from '../hooks/useAcademicStages';
 import { useAcademicYearLabel } from '../components/AcademicYearText';
 import { createStudent } from '../services/students';
 import { logActivity } from '../services/activity';
 import { useAuth } from '../context/AuthContext';
+
+const BIRTH_BOUNDS = birthDateBounds();
 
 export default function NewStudentModal({ onClose, demo }) {
   const { profile } = useAuth();
@@ -30,7 +33,7 @@ export default function NewStudentModal({ onClose, demo }) {
   const [housingType, setHousingType] = useState(HOUSING_TYPE_OPTIONS[0]);
   const [stageId, setStageId] = useState('');
   const [classSection, setClassSection] = useState(SECTION_OPTIONS[0]);
-  const [ageYears, setAgeYears] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [academicYear, setAcademicYear] = useState(liveYear);
   const [shift, setShift] = useState('صباحي');
   const [submitting, setSubmitting] = useState(false);
@@ -53,12 +56,17 @@ export default function NewStudentModal({ onClose, demo }) {
     if (!nationalId.trim()) { setError('رقم الهوية مطلوب.'); return; }
     if (!isValidLocalMobile(phoneLocal)) { setError('أدخل رقم واتساب ولي الأمر بمقدمة +970 أو +972.'); return; }
     if (!residentialAddress.trim()) { setError('عنوان السكن مطلوب.'); return; }
+    if (birthDate && !isPlausibleStudentBirthDate(birthDate)) {
+      setError('تاريخ الميلاد غير منطقي لطالب (3–20 سنة).');
+      return;
+    }
     if (demo) { setError('وضع العرض التوضيحي: صِل مشروع Firebase (راجع .env.local) لحفظ الطلاب فعلياً.'); return; }
     setSubmitting(true);
     setError('');
     try {
       const phoneE164 = toE164Display(phoneDial, phoneLocal);
       const phoneWa = toWhatsAppNumber(phoneDial, phoneLocal);
+      const ageYears = ageFromBirthDate(birthDate);
       const studentId = await createStudent({
         nameFirst, nameFather, nameGrandfather, nameFamily,
         nationalId, guardianName,
@@ -72,6 +80,7 @@ export default function NewStudentModal({ onClose, demo }) {
         guardianWorkStatus,
         housingType,
         stageId: selectedStage?.id, stageLabel, classSection,
+        birthDate: birthDate || null,
         ageYears, academicYear, shift,
       });
       await logActivity({
@@ -99,8 +108,22 @@ export default function NewStudentModal({ onClose, demo }) {
         <Field label="رقم الهوية">
           <input className="input" value={nationalId} onChange={(e) => setNationalId(e.target.value)} required dir="ltr" style={{ textAlign: 'right' }} placeholder="9 أرقام" />
         </Field>
-        <Field label="العمر (سنوات)">
-          <input className="input" type="number" min="3" max="20" value={ageYears} onChange={(e) => setAgeYears(e.target.value)} dir="ltr" style={{ textAlign: 'right' }} />
+        <Field label="تاريخ الميلاد">
+          <input
+            className="input"
+            type="date"
+            value={birthDate}
+            onChange={(e) => setBirthDate(e.target.value)}
+            min={BIRTH_BOUNDS.min}
+            max={BIRTH_BOUNDS.max}
+            dir="ltr"
+            style={{ textAlign: 'right' }}
+          />
+          {ageFromBirthDate(birthDate) != null && (
+            <div style={{ fontSize: 11, color: 'var(--color-neutral-500)', marginTop: 4 }}>
+              العمر: {ageFromBirthDate(birthDate)} سنة
+            </div>
+          )}
         </Field>
       </div>
       <Field label="ولي الأمر"><input className="input" value={guardianName} onChange={(e) => setGuardianName(e.target.value)} required /></Field>

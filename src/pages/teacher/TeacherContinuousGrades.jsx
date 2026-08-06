@@ -127,6 +127,8 @@ export default function TeacherContinuousGrades() {
     } catch (err) {
       if (err?.code === 'TERM_CLOSED' || err?.message === 'TERM_CLOSED') {
         setMessage(`الفصل «${term || err.term || ''}» مقفل من الإدارة — لا يُقبل إدخال درجات جديدة عليه.`);
+      } else if (err?.code === 'TERM_REQUIRED' || err?.message === 'TERM_REQUIRED') {
+        setMessage('اختري الفصل الدراسي قبل إرسال الدرجات.');
       } else {
         setMessage('تعذّر إرسال بعض الدرجات.');
       }

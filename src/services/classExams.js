@@ -1,10 +1,26 @@
-import { addDoc, collection, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { logActivity } from './activity';
 import { notifyMany } from './notifications';
 import { assertTermOpen, fetchAcademicCalendar } from './academicCalendar';
 
 export const classExamsCol = collection(db, 'classExams');
+
+/** Resolve guardian + student Auth UIDs for everyone enrolled in a class. */
+async function resolveClassFamilyUids(classId) {
+  if (!classId) return { parentIds: [], studentIds: [] };
+  const enrollSnap = await getDocs(collection(db, 'classes', classId, 'enrollments'));
+  const parentIds = [];
+  const studentIds = [];
+  await Promise.all(enrollSnap.docs.map(async (e) => {
+    const stuSnap = await getDoc(doc(db, 'students', e.id));
+    if (!stuSnap.exists()) return;
+    const d = stuSnap.data();
+    if (d.guardianUid) parentIds.push(d.guardianUid);
+    if (d.studentUid) studentIds.push(d.studentUid);
+  }));
+  return { parentIds, studentIds };
+}
 
 export async function submitClassExam({
   classId, className, subject, teacherId, teacherName,
@@ -67,14 +83,33 @@ export async function approveClassExam(exam, decidedBy, { studentGuardianUserIds
       link: '/teacher/exams',
     });
   }
-  // Optional fan-out to parent/student uids if provided by admin UI
-  await notifyMany(studentGuardianUserIds, {
+
+  let parentIds = [...(studentGuardianUserIds || [])];
+  let studentIds = [];
+  try {
+    const resolved = await resolveClassFamilyUids(exam.classId);
+    parentIds = [...parentIds, ...resolved.parentIds];
+    studentIds = resolved.studentIds;
+  } catch {
+    // fall through with any explicitly passed IDs
+  }
+
+  const body = `${exam.className || ''} — ${exam.examDate}${exam.startTime ? ` · ${exam.startTime}` : ''}`;
+  await notifyMany(parentIds, {
     role: 'parent',
     type: 'exam_scheduled',
     title: `اختبار: ${exam.title}`,
-    body: `${exam.className || ''} — ${exam.examDate}${exam.startTime ? ` · ${exam.startTime}` : ''}`,
+    body,
     classId: exam.classId,
     link: '/parent/exams',
+  });
+  await notifyMany(studentIds, {
+    role: 'student',
+    type: 'exam_scheduled',
+    title: `اختبار: ${exam.title}`,
+    body,
+    classId: exam.classId,
+    link: '/student/exams',
   });
 }
 

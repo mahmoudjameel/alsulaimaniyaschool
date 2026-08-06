@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { orderBy } from 'firebase/firestore';
+import { orderBy, where } from 'firebase/firestore';
 import ChildSwitcher from '../../components/ChildSwitcher';
 import Icon from '../../components/Icon';
 import { ErrorBanner } from '../../components/ui';
@@ -27,14 +27,15 @@ export default function ParentNotes() {
     visibleToParent: true,
   }));
 
+  // Must filter in the query — rules deny any note with visibleToParent != true
   const { data: notes, error } = useLiveOrDemo(
     `students/${activeId || '__none__'}/notes`,
-    [orderBy('createdAt', 'desc')],
+    [where('visibleToParent', '==', true), orderBy('createdAt', 'desc')],
     demoNotes,
     activeId || '__none__',
   );
 
-  const visible = (notes || []).filter((n) => n.visibleToParent === true);
+  const visible = notes || [];
 
   return (
     <div className="stu-page">

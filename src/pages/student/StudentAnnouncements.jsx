@@ -1,4 +1,4 @@
-import { orderBy } from 'firebase/firestore';
+import { orderBy, where } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import { ErrorBanner } from '../../components/ui';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
@@ -10,38 +10,41 @@ export default function StudentAnnouncements() {
   const { student, error: stuErr } = useMyStudent();
   const { data: raw, error } = useLiveOrDemo(
     'announcements',
-    [orderBy('createdAt', 'desc')],
-    demoAnnouncements,
+    [where('status', '==', 'منشور'), orderBy('createdAt', 'desc')],
+    demoAnnouncements.filter((a) => a.status === 'منشور'),
   );
   const list = filterStudentAnnouncements(raw, student);
 
   return (
     <div className="stu-page">
       <ErrorBanner>{(stuErr || error) && 'تعذّر تحميل الإعلانات.'}</ErrorBanner>
+
       <header className="stu-page-head">
-        <h1 className="stu-page-title">إعلاناتي</h1>
-        <p className="stu-page-lead">إعلانات موجّهة للطلاب أو للجميع أو لمرحلتك الدراسية.</p>
+        <h1 className="stu-page-title">إعلانات</h1>
+        <p className="stu-page-lead">الأحدث أولاً</p>
       </header>
 
-      {list.length === 0 && (
-        <div className="card stu-empty-card">
+      {list.length === 0 ? (
+        <div className="stu-empty-block">
           <Icon name="campaign" size={28} color="var(--gold)" />
-          <p>لا إعلانات مناسبة لك حالياً.</p>
+          <p>ما في إعلانات.</p>
+        </div>
+      ) : (
+        <div className="stu-list">
+          {list.map((a, i) => (
+            <article key={a.id || i} className="stu-announce-card">
+              <div className="stu-note-top">
+                <span className="stu-list-sub">{a.audience || 'الجميع'}</span>
+                <span className="stu-list-time">
+                  {a.date || relativeFromTimestamp(a.createdAt) || ''}
+                </span>
+              </div>
+              <h2 className="stu-list-title" style={{ fontSize: 16 }}>{a.title}</h2>
+              {a.body && <p className="stu-note-text">{a.body}</p>}
+            </article>
+          ))}
         </div>
       )}
-
-      {list.map((a, i) => (
-        <article key={a.id || i} className="card stu-announcement">
-          <div className="stu-announcement-head">
-            <span className="tag tag-outline">{a.audience || 'الجميع'}</span>
-            <span className="stu-feed-time">
-              {a.date || relativeFromTimestamp(a.createdAt) || ''}
-            </span>
-          </div>
-          <h2 className="stu-announcement-title">{a.title}</h2>
-          {a.body && <p className="stu-announcement-body">{a.body}</p>}
-        </article>
-      ))}
     </div>
   );
 }

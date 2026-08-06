@@ -166,13 +166,13 @@ export default function StudentClasses() {
     <div className="stu-page">
       <ErrorBanner>{(studentErr || classErr) && 'تعذّر تحميل الصفوف.'}</ErrorBanner>
       <header className="stu-page-head">
-        <h1 className="stu-page-title">صفوفي ودروسي</h1>
-        <p className="stu-page-lead">جدول الحصص، الدروس، والاختبارات من صفوفك المسجّلة.</p>
+        <h1 className="stu-page-title">صفوفي</h1>
+        <p className="stu-page-lead">اختر صفاً لفتح الدروس والاختبارات</p>
       </header>
       {list.length === 0 && (
-        <div className="card stu-empty-card">
+        <div className="stu-empty-block">
           <Icon name="menu_book" size={28} color="var(--gold)" />
-          <p>لا صفوف مسجّلة على حسابك بعد.</p>
+          <p>ما في صفوف على حسابك بعد.</p>
         </div>
       )}
       <div className="stu-class-grid">

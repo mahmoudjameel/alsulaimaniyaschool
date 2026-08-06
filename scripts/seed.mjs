@@ -56,6 +56,7 @@ async function upsertAuthUser(email, displayName) {
 async function seedAccounts() {
   console.log('→ Creating demo login accounts…');
   const admin = await upsertAuthUser('admin@sulaimaniya.ps', 'فاطمة (المالكة)');
+  const director = await upsertAuthUser('director@sulaimaniya.ps', 'أ. سمر النجار');
   const teacher = await upsertAuthUser('teacher@sulaimaniya.ps', 'أ. خالد الأحمد');
   const accountant = await upsertAuthUser('accountant@sulaimaniya.ps', 'ليلى حسن');
   const reception = await upsertAuthUser('reception@sulaimaniya.ps', 'سارة الاستقبال');
@@ -63,6 +64,10 @@ async function seedAccounts() {
   const student = await upsertAuthUser('stu-1042@students.sulaimaniya.local', 'يوسف الأحمد');
 
   await db.collection('users').doc(admin.uid).set({ role: 'admin', name: 'فاطمة (المالكة)', title: 'مدير عام', permissions: ROLE_DEFAULT_PERMISSIONS.admin });
+  await db.collection('users').doc(director.uid).set({
+    role: 'director', name: 'أ. سمر النجار', title: 'مديرة المدرسة',
+    email: 'director@sulaimaniya.ps', permissions: ROLE_DEFAULT_PERMISSIONS.director,
+  });
   await db.collection('users').doc(teacher.uid).set({ role: 'teacher', name: 'أ. خالد الأحمد', title: 'معلّم لغة عربية', permissions: ROLE_DEFAULT_PERMISSIONS.teacher });
   await db.collection('users').doc(accountant.uid).set({ role: 'accountant', name: 'ليلى حسن', title: 'مسؤولة مالية', permissions: ROLE_DEFAULT_PERMISSIONS.accountant });
   await db.collection('users').doc(reception.uid).set({
@@ -87,7 +92,7 @@ async function seedAccounts() {
   });
   await db.collection('users').doc(student.uid).set({ role: 'student', name: 'يوسف الأحمد', displayId: 'STU-1042', studentId: 's1' });
 
-  return { admin, teacher, accountant, reception, parent, student };
+  return { admin, director, teacher, accountant, reception, parent, student };
 }
 
 async function seedStudents({ parent, student }) {

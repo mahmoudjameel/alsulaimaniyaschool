@@ -6,8 +6,10 @@ import { useAuth } from '../../context/AuthContext';
 import { useMyChildren } from '../../hooks/useMyChildren';
 import { useClassDayLogsMap } from '../../hooks/useClassDayLogsMap';
 import { useClassDocsMap } from '../../hooks/useClassDocsMap';
+import { useClassLessonsMap } from '../../hooks/useClassLessonsMap';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { homeworkSubmissionId, markHomeworkSubmitted } from '../../services/homework';
+import { isHomeworkLesson } from '../../services/studentPortal';
 
 export default function ParentHomework() {
   const { profile } = useAuth();
@@ -24,6 +26,7 @@ export default function ParentHomework() {
   );
   const classIds = useMemo(() => (enrolled || []).map((e) => e.classId || e.id).filter(Boolean), [enrolled]);
   const dayLogsByClass = useClassDayLogsMap(demo ? [] : classIds);
+  const lessonsByClass = useClassLessonsMap(demo ? [] : classIds);
   const classDocs = useClassDocsMap(demo ? [] : classIds);
 
   const { data: submissions } = useLiveOrDemo(
@@ -38,7 +41,7 @@ export default function ParentHomework() {
 
   const homework = useMemo(() => {
     if (demo) {
-      return [{ id: 'demo', title: 'واجب عرض توضيحي', className: 'صف تجريبي', dueDate: null, submissionId: null }];
+      return [{ id: 'demo', title: 'واجب عرض توضيحي', className: 'صف تجريبي', dueDate: null, submissionId: null, source: 'دفتر اليوم' }];
     }
     const rows = [];
     Object.entries(dayLogsByClass).forEach(([classId, logs]) => {
@@ -56,13 +59,34 @@ export default function ParentHomework() {
           classId,
           teacherId: l.teacherId || doc?.teacherId,
           dueDate: date,
+          source: 'دفتر اليوم',
           done: submittedSet.has(sid) || localDone[sid],
           sort: Date.parse(date || '') || 0,
         });
       });
     });
+    Object.entries(lessonsByClass).forEach(([classId, lessons]) => {
+      const doc = classDocs[classId];
+      const meta = (enrolled || []).find((e) => (e.classId || e.id) === classId);
+      (lessons || [])
+        .filter((l) => (!l.status || l.status === 'منشور' || l.published) && isHomeworkLesson(l))
+        .forEach((l) => {
+          rows.push({
+            id: `lesson-${l.id}`,
+            submissionId: null,
+            title: l.title,
+            className: doc?.title || meta?.title || classId,
+            subject: doc?.subject || meta?.subject || '',
+            classId,
+            dueDate: l.dueDate || null,
+            source: 'درس منشور',
+            done: false,
+            sort: Date.parse(l.dueDate || l.createdAt?.toDate?.()?.toISOString?.() || '') || 0,
+          });
+        });
+    });
     return rows.sort((a, b) => b.sort - a.sort);
-  }, [demo, dayLogsByClass, classDocs, enrolled, studentId, submittedSet, localDone]);
+  }, [demo, dayLogsByClass, lessonsByClass, classDocs, enrolled, studentId, submittedSet, localDone]);
 
   const markDone = async (hw) => {
     if (!hw.submissionId || demo || !studentId) return;
@@ -93,7 +117,7 @@ export default function ParentHomework() {
       <ErrorBanner>{error && 'تعذّر التحميل.'}</ErrorBanner>
       <header className="stu-page-head">
         <h1 className="stu-page-title">واجبات الأبناء</h1>
-        <p className="stu-page-lead">من دفتر يوم المعلّم — يمكن تعليم «تمّ التسليم» اختيارياً.</p>
+        <p className="stu-page-lead">من دفتر اليوم والدروس المنشورة — يمكن تعليم «تمّ التسليم» لواجبات الدفتر.</p>
       </header>
 
       {children.length > 1 && (
@@ -117,7 +141,7 @@ export default function ParentHomework() {
           <div className="stu-class-icon"><Icon name="assignment" size={18} /></div>
           <div style={{ flex: 1 }}>
             <div className="stu-class-name">{hw.title}</div>
-            <div className="stu-class-meta">{[hw.subject, hw.className, hw.dueDate].filter(Boolean).join(' · ')}</div>
+            <div className="stu-class-meta">{[hw.source, hw.subject, hw.className, hw.dueDate].filter(Boolean).join(' · ')}</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
             <span className={`tag tag-${hw.done ? 'accent' : 'outline'}`}>{hw.done ? 'تم التسليم' : 'مطلوب'}</span>

@@ -97,9 +97,13 @@ export async function setTermClosed(term, locked, actor) {
   return closedTerms;
 }
 
-/** Throws TERM_CLOSED if the term is locked for new grade entries. */
+/** Throws TERM_CLOSED if the term is locked; TERM_REQUIRED if term missing. */
 export async function assertTermOpen(term) {
-  if (!term) return;
+  if (!term || !ACADEMIC_TERMS.includes(term)) {
+    const err = new Error('TERM_REQUIRED');
+    err.code = 'TERM_REQUIRED';
+    throw err;
+  }
   const cal = await fetchAcademicCalendar();
   if (cal.closedTerms.includes(term)) {
     const err = new Error('TERM_CLOSED');

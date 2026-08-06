@@ -1,12 +1,13 @@
 import { orderBy, where } from 'firebase/firestore';
-import { EmptyRow, ErrorBanner } from '../../components/ui';
+import { ErrorBanner } from '../../components/ui';
+import StudentFeeAidPanel from '../../components/StudentFeeAidPanel';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { useMyStudent } from '../../hooks/useMyStudent';
 import { formatILS } from '../../lib/constants';
 import { demoBilling, demoStudentDetail } from '../../data/demo';
 
 export default function StudentFees() {
-  const { student, studentId, displayName, error: stuErr, demo } = useMyStudent();
+  const { student, studentId, error: stuErr, demo } = useMyStudent();
   const balance = Number(student?.balanceMinorUnits ?? student?.dueMinorUnits ?? 0);
 
   const { data: chargesRaw, error: cErr } = useLiveOrDemo(
@@ -30,67 +31,65 @@ export default function StudentFees() {
 
   return (
     <div className="stu-page">
-      <ErrorBanner>{(stuErr || cErr) && 'تعذّر تحميل البيانات المالية.'}</ErrorBanner>
+      <ErrorBanner>{(stuErr || cErr) && 'تعذّر تحميل المستحقات.'}</ErrorBanner>
+
       <header className="stu-page-head">
         <h1 className="stu-page-title">مستحقاتي</h1>
-        <p className="stu-page-lead">
-          عرض للشفافية فقط — السداد يتم عبر ولي الأمر من بوابته. {displayName}
-        </p>
+        <p className="stu-page-lead">للمتابعة فقط — الدفع من بوابة ولي الأمر</p>
       </header>
 
-      <div className="card" style={{ borderColor: 'color-mix(in srgb, var(--gold) 40%, var(--line))' }}>
-        <span className="card-kicker">الرصيد المستحق حالياً</span>
-        <div className="ah-tabnum" style={{ fontFamily: 'var(--font-heading)', fontSize: 32, color: balance > 0 ? 'var(--gold)' : 'var(--color-accent-700)' }}>
-          {balance > 0 ? formatILS(balance) : 'لا مستحقات'}
-        </div>
+      <div className="stu-balance">
+        <span className="stu-balance-lbl">المبلغ المستحق</span>
+        <span className={`stu-balance-val ah-tabnum${balance > 0 ? '' : ' is-clear'}`}>
+          {balance > 0 ? formatILS(balance) : 'لا شيء'}
+        </span>
       </div>
 
-      <section className="card ah-table-wrap" style={{ padding: 0 }}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)' }}>
-          <h2 className="card-title" style={{ margin: 0 }}>الفواتير</h2>
-        </div>
-        <table className="table">
-          <thead>
-            <tr><th>النوع</th><th>المبلغ</th><th>الحالة</th><th>الطريقة</th></tr>
-          </thead>
-          <tbody>
-            {(charges || []).length === 0 && <EmptyRow colSpan={4}>لا فواتير مسجّلة.</EmptyRow>}
-            {(charges || []).map((c, i) => (
-              <tr key={c.id || i}>
-                <td>{c.type || '—'}</td>
-                <td className="ah-tabnum">{c.amount || formatILS(c.amountMinorUnits)}</td>
-                <td><span className="tag tag-outline">{c.status || '—'}</span></td>
-                <td>{c.method || '—'}</td>
-              </tr>
+      <section>
+        <h2 className="stu-section-title">الفواتير</h2>
+        {charges.length === 0 ? (
+          <p className="stu-empty">ما في فواتير.</p>
+        ) : (
+          <div className="stu-list">
+            {charges.map((c, i) => (
+              <div key={c.id || i} className="stu-list-row">
+                <div className="stu-list-main">
+                  <div className="stu-list-title">{c.type || 'فاتورة'}</div>
+                  <div className="stu-list-sub">{[c.status, c.method].filter(Boolean).join(' · ')}</div>
+                </div>
+                <span className="stu-list-side ah-tabnum">
+                  {c.amount || formatILS(c.amountMinorUnits)}
+                </span>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        )}
       </section>
 
-      <section className="card ah-table-wrap" style={{ padding: 0 }}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)' }}>
-          <h2 className="card-title" style={{ margin: 0 }}>كشف الحساب</h2>
-        </div>
-        <table className="table">
-          <thead>
-            <tr><th>التاريخ</th><th>البند</th><th>مدين</th><th>دائن</th></tr>
-          </thead>
-          <tbody>
-            {(ledger || []).length === 0 && <EmptyRow colSpan={4}>لا حركات في الدفتر.</EmptyRow>}
-            {(ledger || []).map((l, i) => (
-              <tr key={l.id || i}>
-                <td className="ah-tabnum">{l.date || '—'}</td>
-                <td>{l.item}</td>
-                <td className="ah-tabnum">{l.debitMinorUnits ? formatILS(l.debitMinorUnits) : '—'}</td>
-                <td className="ah-tabnum" style={{ color: 'var(--color-accent-700)' }}>
-                  {l.creditMinorUnits ? formatILS(l.creditMinorUnits) : '—'}
-                </td>
-              </tr>
+      <StudentFeeAidPanel studentId={studentId || (demo ? 's1' : null)} demo={demo} framed />
+
+      {(ledger || []).length > 0 && (
+        <section>
+          <h2 className="stu-section-title">آخر الحركات</h2>
+          <div className="stu-list">
+            {(ledger || []).slice(0, 12).map((l, i) => (
+              <div key={l.id || i} className="stu-list-row">
+                <div className="stu-list-main">
+                  <div className="stu-list-title">{l.item}</div>
+                  <div className="stu-list-sub ah-tabnum">{l.date || '—'}</div>
+                </div>
+                <span className="stu-list-side ah-tabnum">
+                  {l.creditMinorUnits
+                    ? `+${formatILS(l.creditMinorUnits)}`
+                    : l.debitMinorUnits
+                      ? formatILS(l.debitMinorUnits)
+                      : '—'}
+                </span>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </section>
-      {demo && <p className="stu-class-meta">وضع العرض التوضيحي.</p>}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
