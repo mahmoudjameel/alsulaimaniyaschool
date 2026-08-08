@@ -1,64 +1,112 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Modal from '../components/Modal';
+import ChipToggle from '../components/ChipToggle';
 import { Field } from '../components/ui';
 import { createClass } from '../services/academics';
 import { logActivity } from '../services/activity';
 import { useAuth } from '../context/AuthContext';
 import { useAssignableTeachers } from '../hooks/useAssignableTeachers';
 import { useAcademicStages } from '../hooks/useAcademicStages';
+import {
+  CLASS_DAYS, CLASS_SUBJECTS, deriveClassMetaFromSchedule,
+  emptyScheduleRow, expandScheduleSlots, subjectsLabel, toggleInList,
+} from '../lib/classForm';
+import { SECTION_OPTIONS } from '../lib/constants';
 
-const SUBJECTS = ['لغة عربية', 'رياضيات', 'علوم', 'إنجليزي', 'تربية إسلامية', 'فنون', 'الحاسوب والتقنية', 'التربية الرياضية'];
 const VISIBILITIES = ['المدرسة', 'عام', 'دعوة فقط'];
 const SHIFTS = ['صباحي', 'مسائي'];
-const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 
 export default function NewClassModal({ onClose, demo }) {
   const { profile } = useAuth();
   const { teachers } = useAssignableTeachers();
   const { stages, labels } = useAcademicStages();
   const [title, setTitle] = useState('');
-  const [subject, setSubject] = useState(SUBJECTS[0]);
-  const [teacherId, setTeacherId] = useState('');
   const [grade, setGrade] = useState('');
+  const [classSection, setClassSection] = useState(SECTION_OPTIONS[0]);
   const [shift, setShift] = useState(SHIFTS[0]);
   const [visibility, setVisibility] = useState(VISIBILITIES[0]);
-  const [schedule, setSchedule] = useState([{ day: DAYS[0], start: '08:00', end: '08:45' }]);
+  const [schedule, setSchedule] = useState([emptyScheduleRow()]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const teachersById = useMemo(
+    () => Object.fromEntries(teachers.map((t) => [t.id, t])),
+    [teachers],
+  );
+  const loginTeachers = useMemo(() => teachers.filter((t) => t.login), [teachers]);
 
   useEffect(() => {
     if (!grade && labels[0]) setGrade(labels[0]);
   }, [labels, grade]);
 
   useEffect(() => {
-    if (!teacherId && teachers.length) {
-      const preferred = teachers.find((t) => t.login) || teachers[0];
-      if (preferred) setTeacherId(preferred.id);
-    }
-  }, [teachers, teacherId]);
+    const preferred = loginTeachers[0] || teachers[0];
+    if (!preferred) return;
+    setSchedule((rows) => {
+      if (!rows.some((row) => !row.teacherId)) return rows;
+      return rows.map((row) => (row.teacherId ? row : { ...row, teacherId: preferred.id }));
+    });
+  }, [teachers, loginTeachers]);
 
   const updateSlot = (i, patch) => setSchedule((s) => s.map((row, j) => (j === i ? { ...row, ...patch } : row)));
-  const addSlot = () => setSchedule((s) => [...s, { day: DAYS[0], start: '08:00', end: '08:45' }]);
+  const toggleDay = (i, day) => {
+    setSchedule((s) => s.map((row, j) => {
+      if (j !== i) return row;
+      const days = toggleInList(row.days, day);
+      return { ...row, days: days.length ? days : [day] };
+    }));
+  };
+  const addSlot = () => {
+    const last = schedule[schedule.length - 1];
+    setSchedule((s) => [...s, emptyScheduleRow({
+      subject: last?.subject || CLASS_SUBJECTS[0],
+      teacherId: last?.teacherId || loginTeachers[0]?.id || teachers[0]?.id || '',
+      start: last?.start || '08:00',
+      end: last?.end || '08:45',
+    })]);
+  };
   const removeSlot = (i) => setSchedule((s) => s.filter((_, j) => j !== i));
 
   const onSubmit = async (e) => {
     e.preventDefault();
     if (demo) { setError('وضع العرض التوضيحي: صِل مشروع Firebase لإنشاء الصفوف فعلياً.'); return; }
-    const teacher = teachers.find((t) => t.id === teacherId);
-    if (!teacher) { setError('اختر معلّماً.'); return; }
-    if (!teacher.login) {
-      setError('اختر معلّماً لديه حساب دخول (من دعوة المستخدمين) حتى يظهر الصف في بوابة المعلّم.');
-      return;
+
+    for (let i = 0; i < schedule.length; i += 1) {
+      const row = schedule[i];
+      if (!row.subject) { setError(`الحصة ${i + 1}: اختر المادة.`); return; }
+      if (!row.teacherId) { setError(`الحصة ${i + 1}: اختر المعلّم.`); return; }
+      const teacher = teachersById[row.teacherId];
+      if (!teacher?.login) {
+        setError(`الحصة ${i + 1}: اختر معلّماً لديه حساب دخول حتى يظهر الصف في بوابته.`);
+        return;
+      }
+      if (!row.days?.length) { setError(`الحصة ${i + 1}: اختر يوماً واحداً على الأقل.`); return; }
     }
+
+    const flatSchedule = expandScheduleSlots(schedule, teachersById);
+    if (!flatSchedule.length) { setError('أضف حصة واحدة على الأقل في الجدول.'); return; }
+
+    const meta = deriveClassMetaFromSchedule(flatSchedule, teachers);
     setSubmitting(true);
     setError('');
     try {
       const classId = await createClass({
-        title, subject, teacherId: teacher.id, teacherName: teacher.name, grade, shift, visibility, schedule,
+        title,
+        ...meta,
+        grade,
+        classSection: classSection || null,
+        shift,
+        visibility,
+        schedule: flatSchedule,
       });
       await logActivity({
-        type: 'class_created', actorUid: profile?.id, actorName: profile?.name, actorRole: profile?.role,
-        summary: `إنشاء صفّ جديد: ${title} (${subject}) — ${teacher.name}`, targetType: 'class', targetId: classId,
+        type: 'class_created',
+        actorUid: profile?.id,
+        actorName: profile?.name,
+        actorRole: profile?.role,
+        summary: `إنشاء صفّ جديد: ${title} (${subjectsLabel(meta.subjects)}) — ${grade}${classSection ? ` / ${classSection}` : ''} · ${meta.teacher}`,
+        targetType: 'class',
+        targetId: classId,
       });
       onClose();
     } catch {
@@ -69,64 +117,129 @@ export default function NewClassModal({ onClose, demo }) {
   };
 
   return (
-    <Modal title="إنشاء صفّ جديد" onClose={onClose} onSubmit={onSubmit} submitLabel="إنشاء الصف" submitting={submitting} error={error} width={560}>
+    <Modal title="إنشاء صفّ جديد" onClose={onClose} onSubmit={onSubmit} submitLabel="إنشاء الصف" submitting={submitting} error={error} width={620}>
       <div className="dialog-body">
-        عيّن معلّماً بحساب دخول، وحدّد جدول الحصص — يظهر مباشرة في بوابة المعلّم.
+        عرّف الصف (المرحلة والشعبة)، ثم أضف الحصص. الطلاب المسجّلون بنفس المرحلة/الشعبة/الدوام يُضافون تلقائياً.
       </div>
-      <Field label="عنوان الصف"><input className="input" placeholder="مثال: القراءة التفاعلية" value={title} onChange={(e) => setTitle(e.target.value)} required /></Field>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="المادة">
-          <select className="input" value={subject} onChange={(e) => setSubject(e.target.value)}>
-            {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
-          </select>
-        </Field>
-        <Field label="المعلّم (حساب دخول)">
-          <select className="input" value={teacherId} onChange={(e) => setTeacherId(e.target.value)} required>
-            <option value="" disabled>اختر معلّماً…</option>
-            {teachers.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} — {t.subject}{t.login ? '' : ' (دليل فقط)'}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+
+      <Field label="عنوان الصف">
+        <input className="input" placeholder="مثال: الصف الرابع أ" value={title} onChange={(e) => setTitle(e.target.value)} required />
+      </Field>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
         <Field label="الصف الدراسي">
           <select className="input" value={grade} onChange={(e) => setGrade(e.target.value)}>
             {stages.map((s) => <option key={s.id} value={s.labelAr}>{s.labelAr}</option>)}
           </select>
         </Field>
+        <Field label="الشعبة">
+          <select className="input" value={classSection} onChange={(e) => setClassSection(e.target.value)}>
+            {SECTION_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </Field>
         <Field label="الدوام">
           <div className="seg" style={{ marginTop: 2 }}>
             {SHIFTS.map((s) => (
-              <label key={s} className="seg-opt"><input type="radio" name="shift" checked={shift === s} onChange={() => setShift(s)} /><span>{s}</span></label>
+              <label key={s} className="seg-opt">
+                <input type="radio" name="shift" checked={shift === s} onChange={() => setShift(s)} />
+                <span>{s}</span>
+              </label>
             ))}
           </div>
         </Field>
       </div>
+
       <Field label="الظهور">
         <div className="seg" style={{ marginTop: 2 }}>
           {VISIBILITIES.map((v) => (
-            <label key={v} className="seg-opt"><input type="radio" name="vis" checked={visibility === v} onChange={() => setVisibility(v)} /><span>{v}</span></label>
+            <label key={v} className="seg-opt">
+              <input type="radio" name="vis" checked={visibility === v} onChange={() => setVisibility(v)} />
+              <span>{v}</span>
+            </label>
           ))}
         </div>
       </Field>
+
       <div className="field">
-        <label>جدول الحصص الأسبوعي</label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+        <label>جدول الحصص</label>
+        <div style={{ fontSize: 12, color: 'var(--color-neutral-500)', marginBottom: 10, lineHeight: 1.6 }}>
+          كل بطاقة = حصة (مادة + معلّم + وقت). اختر عدة أيام لنفس الحصة إن تكررت بنفس الوقت.
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {schedule.map((row, i) => (
-            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr auto', gap: 8, alignItems: 'center' }}>
-              <select className="input" value={row.day} onChange={(e) => updateSlot(i, { day: e.target.value })}>
-                {DAYS.map((d) => <option key={d}>{d}</option>)}
-              </select>
-              <input className="input" type="time" dir="ltr" value={row.start} onChange={(e) => updateSlot(i, { start: e.target.value })} />
-              <input className="input" type="time" dir="ltr" value={row.end} onChange={(e) => updateSlot(i, { end: e.target.value })} />
-              <button type="button" className="btn btn-icon btn-ghost" onClick={() => removeSlot(i)} disabled={schedule.length === 1}>×</button>
+            <div
+              key={i}
+              style={{
+                border: '1px solid var(--line)',
+                borderRadius: 12,
+                padding: 14,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
+                background: 'var(--color-neutral-50, #fafafa)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>حصة {i + 1}</span>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}
+                  onClick={() => removeSlot(i)}
+                  disabled={schedule.length === 1}
+                >
+                  حذف
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <Field label="المادة">
+                  <select className="input" value={row.subject} onChange={(e) => updateSlot(i, { subject: e.target.value })}>
+                    {CLASS_SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </Field>
+                <Field label="المعلّم">
+                  <select
+                    className="input"
+                    value={row.teacherId}
+                    onChange={(e) => updateSlot(i, { teacherId: e.target.value })}
+                    required
+                  >
+                    <option value="" disabled>اختر معلّماً…</option>
+                    {teachers.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}{t.subject ? ` — ${t.subject}` : ''}{t.login ? '' : ' (دليل فقط)'}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, color: 'var(--color-neutral-600)', marginBottom: 6 }}>الأيام</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {CLASS_DAYS.map((d) => (
+                    <ChipToggle key={d} selected={(row.days || []).includes(d)} onClick={() => toggleDay(i, d)}>
+                      {d}
+                    </ChipToggle>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <Field label="من">
+                  <input className="input" type="time" dir="ltr" value={row.start} onChange={(e) => updateSlot(i, { start: e.target.value })} />
+                </Field>
+                <Field label="إلى">
+                  <input className="input" type="time" dir="ltr" value={row.end} onChange={(e) => updateSlot(i, { end: e.target.value })} />
+                </Field>
+              </div>
             </div>
           ))}
         </div>
-        <button type="button" className="btn btn-ghost" style={{ fontSize: 12, marginTop: 8 }} onClick={addSlot}>+ إضافة حصّة</button>
+        <button type="button" className="btn btn-secondary" style={{ fontSize: 13, marginTop: 12 }} onClick={addSlot}>
+          + إضافة حصة (مادة / معلّم)
+        </button>
       </div>
     </Modal>
   );

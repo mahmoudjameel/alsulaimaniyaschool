@@ -6,7 +6,7 @@ import { shekelsToMinorUnits } from '../lib/constants';
 
 export const staffCol = collection(db, 'staff');
 
-export async function createStaffMember(payload) {
+function buildStaffFields(payload) {
   const {
     name, roleType, jobTitleAr, salaryType,
     monthlySalaryShekels, hourlyRateShekels, dailyRateShekels, hoursPerMonth,
@@ -19,7 +19,7 @@ export async function createStaffMember(payload) {
   const baseMinorUnits = monthlySalaryMinorUnits || hourlyRateMinorUnits || dailyRateMinorUnits || 0;
   const legacyType = salaryType === 'hourly' ? 'أجر ساعة' : salaryType === 'daily' ? 'راتب يومي' : 'راتب شهري';
 
-  const ref = await addDoc(staffCol, {
+  return {
     name: (name || '').trim(),
     roleType: roleType || 'other',
     jobTitleAr: (jobTitleAr || '').trim() || 'موظف',
@@ -35,6 +35,22 @@ export async function createStaffMember(payload) {
     notes: (notes || '').trim() || null,
     authUid: authUid || null,
     active: true,
+  };
+}
+
+export async function createStaffMember(payload) {
+  const fields = buildStaffFields(payload);
+  // When linking an existing portal user, use their Auth UID as the staff doc id.
+  if (fields.authUid) {
+    await setDoc(doc(db, 'staff', fields.authUid), {
+      ...fields,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+    return fields.authUid;
+  }
+  const ref = await addDoc(staffCol, {
+    ...fields,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });

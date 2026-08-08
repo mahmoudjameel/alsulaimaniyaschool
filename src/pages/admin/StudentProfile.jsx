@@ -1,20 +1,26 @@
 import { useMemo, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import { orderBy } from 'firebase/firestore';
+import { orderBy, where } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import BackButton from '../../components/BackButton';
 import { EmptyRow, ErrorBanner } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useDocOrDemo, useLiveOrDemo } from '../../hooks/useFirestore';
-import { demoStudents, demoStudentDetail, demoAttendanceRecords } from '../../data/demo';
+import { demoStudents, demoStudentDetail, demoAttendanceRecords, demoBilling } from '../../data/demo';
 import { formatILS, SCHOOL_NAME_AR } from '../../lib/constants';
+import { ACADEMIC_TUITION_MONTHS, tuitionPlanTotals } from '../../lib/billingPeriods';
+import { formatChargeTypeLabel, formatChargePeriodLabel } from '../../lib/chargeFilters';
+import { useAcademicStages } from '../../hooks/useAcademicStages';
 import { formatBirthDateDisplay } from '../../lib/birthDate';
 import { relativeDaysAr, relativeFromTimestamp } from '../../lib/relativeTime';
 import { computeAttendanceRate, computeMonthlyAttendance } from '../../lib/attendance';
 import EditStudentModal from '../../modals/EditStudentModal';
+import EditInvoiceModal from '../../modals/EditInvoiceModal';
 import { FEE_REMINDER_TEMPLATE, GENERAL_MESSAGE_TEMPLATE, openWhatsAppChat, parseStoredPhone } from '../../lib/phone';
 import { studentsListPath, staffPortalBase } from '../../lib/portalPaths';
 import { sendAdminStudentAlert } from '../../services/staffRequests';
+import { enrollStudentInMatchingClasses } from '../../services/academics';
+import { logActivity } from '../../services/activity';
 
 const TABS = [
   { id: 'overview', label: 'نظرة عامة' }, { id: 'guardians', label: 'أولياء الأمور' },
@@ -28,11 +34,15 @@ export default function StudentProfile() {
   const { pathname } = useLocation();
   const { profile } = useAuth();
   const portalBase = staffPortalBase(pathname);
+  const { stages } = useAcademicStages();
   const [tab, setTab] = useState('overview');
   const [editing, setEditing] = useState(false);
   const [alertText, setAlertText] = useState('');
   const [alertMsg, setAlertMsg] = useState('');
   const [alertBusy, setAlertBusy] = useState(false);
+  const [placeBusy, setPlaceBusy] = useState(false);
+  const [placeMsg, setPlaceMsg] = useState('');
+  const [editingCharge, setEditingCharge] = useState(null);
 
   const { data: student, demo } = useDocOrDemo(`students/${id}`, demoStudents.find((s) => s.id === id) || demoStudents[0]);
   const detail = demo ? (demoStudentDetail[id] || demoStudentDetail.s1) : null;
@@ -41,11 +51,36 @@ export default function StudentProfile() {
   const documents = useLiveOrDemo(`students/${id}/documents`, [orderBy('date', 'desc')], detail?.documents || []);
   const attendance = useLiveOrDemo(`students/${id}/attendanceRecords`, [orderBy('date', 'desc')], demoAttendanceRecords[id] || []);
   const notes = useLiveOrDemo(`students/${id}/notes`, [orderBy('createdAt', 'desc')], detail?.notes || []);
+  const { data: studentCharges } = useLiveOrDemo(
+    'charges',
+    [where('studentId', '==', id || '__none__')],
+    (demoBilling?.charges || []).filter((c) => c.studentId === id),
+    id || '__none__',
+  );
+
+  const monthlyCharges = useMemo(() => {
+    const list = [...(studentCharges || [])];
+    list.sort((a, b) => String(a.period || '').localeCompare(String(b.period || '')));
+    return list;
+  }, [studentCharges]);
   const guardians = useLiveOrDemo(`students/${id}/guardians`, [orderBy('createdAt', 'asc')], detail?.guardians || []);
   const classesList = useLiveOrDemo(`students/${id}/classes`, [orderBy('createdAt', 'asc')], detail?.classes || []);
 
   const monthlyAttendance = useMemo(() => computeMonthlyAttendance(attendance.data), [attendance.data]);
   const attendanceRate = useMemo(() => computeAttendanceRate(attendance.data), [attendance.data]);
+
+  const stageForFees = useMemo(() => {
+    if (!student) return null;
+    return stages.find((s) => s.id === student.stageId)
+      || stages.find((s) => s.labelAr === student.stageLabel)
+      || null;
+  }, [stages, student]);
+
+  const feePlan = useMemo(() => {
+    const monthly = Number(stageForFees?.monthlyTuitionMinorUnits) || 0;
+    const seat = Number(stageForFees?.seatReservationMinorUnits) || 0;
+    return tuitionPlanTotals(monthly, seat);
+  }, [stageForFees]);
 
   if (!student) return <ErrorBanner>تعذّر العثور على هذا الطالب.</ErrorBanner>;
 
@@ -118,7 +153,11 @@ export default function StudentProfile() {
             style={{ fontSize: 13 }}
             disabled={alertBusy || !alertText.trim()}
             onClick={async () => {
-              const teacherIds = [...new Set((classesList.data || []).map((c) => c.teacherId).filter(Boolean))];
+              const teacherIds = [...new Set((classesList.data || []).flatMap((c) => [
+                c.teacherId,
+                ...(c.teacherIds || []),
+                ...(c.schedule || []).map((s) => s.teacherId),
+              ]).filter(Boolean))];
               if (teacherIds.length === 0) {
                 setAlertMsg('لا معلّمين مرتبطين بصفوف الطالب.');
                 return;
@@ -158,6 +197,13 @@ export default function StudentProfile() {
           student={student}
           demo={demo}
           onClose={() => setEditing(false)}
+        />
+      )}
+      {editingCharge && (
+        <EditInvoiceModal
+          charge={editingCharge}
+          demo={demo}
+          onClose={() => setEditingCharge(null)}
         />
       )}
 
@@ -254,6 +300,21 @@ export default function StudentProfile() {
       {tab === 'finance' && (
         <>
           <div className="card">
+            <div className="card-title" style={{ marginBottom: 6 }}>خطة العام الدراسي ({ACADEMIC_TUITION_MONTHS} أشهر)</div>
+            <div style={{ fontSize: 13, lineHeight: 1.8 }}>
+              <div>الصف: <strong>{student.grade || '—'}</strong>{student.shift ? ` · ${student.shift}` : ''}</div>
+              <div>حجز مقعد: <strong className="ah-tabnum">{feePlan.seatMinorUnits > 0 ? formatILS(feePlan.seatMinorUnits) : '—'}</strong></div>
+              <div>
+                قسط شهري: <strong className="ah-tabnum">{feePlan.monthlyMinorUnits > 0 ? formatILS(feePlan.monthlyMinorUnits) : '—'}</strong>
+                {' '}× {ACADEMIC_TUITION_MONTHS} = <strong className="ah-tabnum">{formatILS(feePlan.tuitionTotalMinorUnits)}</strong>
+              </div>
+              <div>
+                إجمالي الخطة: <strong className="ah-tabnum" style={{ color: 'var(--gold)' }}>{formatILS(feePlan.grandTotalMinorUnits)}</strong>
+                <span style={{ color: 'var(--color-neutral-500)' }}> (أيلول → حزيران)</span>
+              </div>
+            </div>
+          </div>
+          <div className="card">
             <div className="card-title" style={{ marginBottom: 6 }}>ملخّص مالي</div>
             {finance ? (
               <>
@@ -268,6 +329,44 @@ export default function StudentProfile() {
                 <div style={{ fontSize: 12, color: 'var(--color-neutral-500)', marginTop: 6 }}>يُحدَّث تلقائياً من الفواتير والدفعات المعتمدة.</div>
               </>
             )}
+          </div>
+          <div className="card">
+            <div className="card-title" style={{ marginBottom: 8 }}>فواتير الأشهر (كل شهر على حدة)</div>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>الشهر</th>
+                  <th>الفاتورة</th>
+                  <th>المبلغ</th>
+                  <th>الحالة</th>
+                  <th>الدفع</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthlyCharges.length === 0 && <EmptyRow colSpan={6}>لا فواتير بعد لهذا الطالب.</EmptyRow>}
+                {monthlyCharges.map((c) => (
+                  <tr key={c.id}>
+                    <td style={{ fontSize: 13 }}>{formatChargePeriodLabel(c) || '—'}</td>
+                    <td>{formatChargeTypeLabel(c)}</td>
+                    <td className="ah-tabnum">{formatILS(c.amountMinorUnits)}</td>
+                    <td><span className="tag tag-outline">{c.status || '—'}</span></td>
+                    <td style={{ fontSize: 13 }}>{c.method || '—'}</td>
+                    <td style={{ textAlign: 'left' }}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ fontSize: 12 }}
+                        disabled={demo || !c.id}
+                        onClick={() => setEditingCharge(c)}
+                      >
+                        تعديل
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
           <div className="card">
             <div className="card-title" style={{ marginBottom: 8 }}>دفتر الحساب — سجل زمني</div>
@@ -311,19 +410,73 @@ export default function StudentProfile() {
       )}
 
       {tab === 'classes' && (
-        <div className="ah-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
-          {classesList.data.length === 0 && <div style={{ fontSize: 13, color: 'var(--color-neutral-500)' }}>الطالب غير مسجّل في أي صف بعد.</div>}
-          {classesList.data.map((c, i) => (
-            <div key={i} className="card">
-              <span className="tag tag-outline" style={{ alignSelf: 'flex-start' }}>{c.subject}</span>
-              <div className="card-title" style={{ fontSize: 16 }}>{c.title}</div>
-              <div className="card-meta">{c.teacher}</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                <span style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>التقدير</span>
-                <span className="tag tag-accent">{c.grade}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--color-neutral-600)', flex: 1, lineHeight: 1.6 }}>
+              التوزيع حسب تسجيل الإدارة: المرحلة ({student.stageLabel || '—'}) · الشعبة ({student.classSection || '—'}) · الدوام ({student.shift || '—'}).
+            </p>
+            {!demo && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ fontSize: 13 }}
+                disabled={placeBusy}
+                onClick={async () => {
+                  setPlaceBusy(true);
+                  setPlaceMsg('');
+                  try {
+                    const result = await enrollStudentInMatchingClasses({
+                      id,
+                      name: student.name,
+                      displayId: student.displayId,
+                      grade: student.grade,
+                      stageLabel: student.stageLabel,
+                      classSection: student.classSection,
+                      shift: student.shift,
+                      status: student.status,
+                    });
+                    await logActivity({
+                      type: 'enrollment_synced',
+                      actorUid: profile?.id,
+                      actorName: profile?.name,
+                      actorRole: profile?.role,
+                      summary: `توزيع ${student.name} على الصفوف: +${result.enrolled} من ${result.matched} مطابق`,
+                      targetType: 'student',
+                      targetId: id,
+                    });
+                    setPlaceMsg(result.matched === 0
+                      ? 'لا صفوف مطابقة — أنشئ صفّاً بنفس المرحلة والشعبة والدوام.'
+                      : `تم: أُضيف إلى ${result.enrolled} صف جديد (مطابق ${result.matched}).`);
+                  } catch {
+                    setPlaceMsg('تعذّر التوزيع التلقائي.');
+                  } finally {
+                    setPlaceBusy(false);
+                  }
+                }}
+              >
+                <Icon name="school" size={14} /> {placeBusy ? 'جاري التوزيع…' : 'توزيع على صفوف المرحلة'}
+              </button>
+            )}
+          </div>
+          {placeMsg && <div style={{ fontSize: 13, color: 'var(--color-accent-800)' }}>{placeMsg}</div>}
+          <div className="ah-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
+            {classesList.data.length === 0 && (
+              <div style={{ fontSize: 13, color: 'var(--color-neutral-500)' }}>
+                الطالب غير مسجّل في أي صف بعد. اضغط «توزيع على صفوف المرحلة» أو سجّله يدوياً من شاشة التسجيل.
               </div>
-            </div>
-          ))}
+            )}
+            {classesList.data.map((c, i) => (
+              <div key={c.id || i} className="card">
+                <span className="tag tag-outline" style={{ alignSelf: 'flex-start' }}>{c.subject}</span>
+                <div className="card-title" style={{ fontSize: 16 }}>{c.title}</div>
+                <div className="card-meta">{c.teacher}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                  <span style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>الصف</span>
+                  <span className="tag tag-accent">{c.grade}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

@@ -12,7 +12,7 @@ import { formatILS } from '../lib/constants';
 import {
   DISBURSEMENT_KINDS, currentPeriod, normalizeStaff, periodLabel,
 } from '../lib/staff';
-import { createDisbursement, markDisbursementPaid } from '../services/disbursements';
+import { createDisbursement, markDisbursementPaid, updateDisbursement, deleteDisbursement } from '../services/disbursements';
 
 const KIND_TABS = [
   { id: 'all', label: 'الكل' },
@@ -102,6 +102,7 @@ export default function Disbursements() {
   const [newKind, setNewKind] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [demoPaid, setDemoPaid] = useState({});
+  const [editing, setEditing] = useState(null);
 
   const { data: live, demo, error } = useLiveOrDemo('disbursements', [orderBy('createdAt', 'desc')], demoDisbursements);
   const { data: staffRaw } = useLiveOrDemo('staff', [orderBy('name', 'asc')], []);
@@ -116,6 +117,19 @@ export default function Disbursements() {
     try {
       if (demo) setDemoPaid((s) => ({ ...s, [row.id]: true }));
       else await markDisbursementPaid(row.id, { uid: profile?.id, name: profile?.name });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const onDelete = async (row) => {
+    if (demo) return;
+    if (!window.confirm(`حذف سجل «${kindLabel(row.kind)}»؟`)) return;
+    setBusyId(row.id);
+    try {
+      await deleteDisbursement(row.id);
+    } catch {
+      window.alert('تعذّر الحذف.');
     } finally {
       setBusyId(null);
     }
@@ -171,12 +185,18 @@ export default function Disbursements() {
                 </td>
                 <td className="ah-tabnum" style={{ color: 'var(--gold)', fontWeight: 600 }}>{formatILS(r.amountMinorUnits)}</td>
                 <td><span className={`tag tag-${r.status === 'مدفوع' ? 'accent' : 'outline'}`}>{r.status}</span></td>
-                <td style={{ textAlign: 'left' }}>
+                <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11 }} disabled={demo || busyId === r.id} onClick={() => setEditing(r)}>
+                    تعديل
+                  </button>
                   {r.status === 'قيد الدفع' && (
                     <button type="button" className="btn btn-primary" style={{ fontSize: 11, padding: '4px 10px' }} disabled={busyId === r.id} onClick={() => onPay(r)}>
                       تأكيد الدفع
                     </button>
                   )}
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11, color: 'var(--color-accent-2-700)' }} disabled={demo || busyId === r.id} onClick={() => onDelete(r)}>
+                    حذف
+                  </button>
                 </td>
               </tr>
             ))}
@@ -192,6 +212,58 @@ export default function Disbursements() {
           onClose={() => setNewKind(null)}
         />
       )}
+      {editing && (
+        <EditDisbursementModal
+          row={editing}
+          demo={demo}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
+  );
+}
+
+function EditDisbursementModal({ row, demo, onClose }) {
+  const [amount, setAmount] = useState(
+    row?.amountMinorUnits != null ? String(Number(row.amountMinorUnits) / 100) : '',
+  );
+  const [note, setNote] = useState(row?.note || '');
+  const [vendor, setVendor] = useState(row?.vendor || '');
+  const [staffName, setStaffName] = useState(row?.staffName || '');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    if (demo) { setError('صِل Firebase للحفظ.'); return; }
+    setSubmitting(true);
+    setError('');
+    try {
+      await updateDisbursement(row.id, {
+        amountShekels: amount,
+        note,
+        vendor: row.kind === 'consumable' ? vendor : undefined,
+        staffName: row.kind !== 'consumable' ? staffName : undefined,
+      });
+      onClose();
+    } catch {
+      setError('تعذّر الحفظ.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal title="تعديل السجل" onClose={onClose} onSubmit={onSubmit} submitLabel="حفظ" submitting={submitting} error={error} width={440}>
+      {row.kind === 'consumable' ? (
+        <Field label="المورّد"><input className="input" value={vendor} onChange={(e) => setVendor(e.target.value)} /></Field>
+      ) : (
+        <Field label="الموظف"><input className="input" value={staffName} onChange={(e) => setStaffName(e.target.value)} /></Field>
+      )}
+      <Field label="المبلغ (₪)">
+        <input className="input" type="number" min="0" dir="ltr" style={{ textAlign: 'right' }} value={amount} onChange={(e) => setAmount(e.target.value)} required />
+      </Field>
+      <Field label="ملاحظة"><input className="input" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+    </Modal>
   );
 }

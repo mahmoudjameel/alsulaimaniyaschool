@@ -4,7 +4,7 @@ import { EmptyRow, ErrorBanner, Field } from '../../components/ui';
 import { useAcademicStages } from '../../hooks/useAcademicStages';
 import { formatILS } from '../../lib/constants';
 import {
-  createStage, deleteStage, seedDefaultStages, setStageMonthlyFee, updateStage,
+  createStage, deleteStage, seedDefaultStages, setStageMonthlyFee, setStageSeatFee, updateStage,
 } from '../../services/stages';
 
 const CATEGORIES = [
@@ -13,17 +13,24 @@ const CATEGORIES = [
   { id: 'secondary', label: 'ثانوي' },
 ];
 
+function seatLabel(minor) {
+  if (minor == null || Number(minor) <= 0) return 'بدون حجز';
+  return formatILS(minor);
+}
+
 export default function AcademicStages() {
   const { stages, demo, error } = useAcademicStages();
   const [labelAr, setLabelAr] = useState('');
   const [category, setCategory] = useState('primary');
   const [ageRange, setAgeRange] = useState('');
   const [monthlyFee, setMonthlyFee] = useState('400');
+  const [seatFee, setSeatFee] = useState('50');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editLabel, setEditLabel] = useState('');
   const [editFee, setEditFee] = useState('');
+  const [editSeat, setEditSeat] = useState('');
 
   const onAdd = async (e) => {
     e.preventDefault();
@@ -33,11 +40,16 @@ export default function AcademicStages() {
     setMessage('');
     try {
       await createStage({
-        labelAr, category, ageRange, order: stages.length, monthlyTuitionShekels: monthlyFee,
+        labelAr,
+        category,
+        ageRange,
+        order: stages.length,
+        monthlyTuitionShekels: monthlyFee,
+        seatReservationShekels: seatFee,
       });
       setLabelAr('');
       setAgeRange('');
-      setMessage('أُضيفت المرحلة مع الرسوم الشهرية.');
+      setMessage('أُضيفت المرحلة مع الرسوم الشهرية وحجز المقعد.');
     } catch {
       setMessage('تعذّر إضافة المرحلة.');
     } finally {
@@ -50,7 +62,7 @@ export default function AcademicStages() {
     setBusy(true);
     try {
       await seedDefaultStages();
-      setMessage('زُرعت المراحل الافتراضية مع رسوم شهرية لكل مرحلة.');
+      setMessage('زُرعت المراحل الافتراضية مع رسوم شهرية وحجز مقعد ₪50 لكل مرحلة.');
     } catch {
       setMessage('تعذّر الزرع.');
     } finally {
@@ -67,6 +79,7 @@ export default function AcademicStages() {
     if (demo || !editLabel.trim()) return;
     await updateStage(stage.id, { labelAr: editLabel.trim() });
     if (editFee !== '') await setStageMonthlyFee(stage.id, editFee);
+    if (editSeat !== '') await setStageSeatFee(stage.id, editSeat);
     setEditingId(null);
   };
 
@@ -91,15 +104,15 @@ export default function AcademicStages() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <ErrorBanner>{error && 'تعذّر تحميل المراحل الدراسية.'}</ErrorBanner>
       <div className="card" style={{ borderColor: 'var(--color-accent-300)', background: 'var(--color-accent-100)', padding: '14px 16px' }}>
-        <div style={{ fontSize: 13, color: 'var(--color-accent-900)' }}>
-          حدّد <strong>الرسوم الشهرية</strong> لكل مرحلة — عند توليد الفواتير تُفرض تلقائياً على كل طالب في تلك المرحلة.
-          مناسب لظروف العمل المتغيّرة: عدّل المبلغ في أي وقت قبل التوليد.
+        <div style={{ fontSize: 13, color: 'var(--color-accent-900)', lineHeight: 1.7 }}>
+          حدّد <strong>الرسوم الشهرية</strong> و<strong>حجز المقعد</strong> لكل مرحلة.
+          حجز المقعد اختياري — إن وُجد مبلغ أكبر من صفر يُسجَّل تلقائياً كفاتورة عند قبول التسجيل أو إضافة طالب جديد.
         </div>
       </div>
 
       <form className="card" onSubmit={onAdd}>
         <div className="card-title" style={{ marginBottom: 10 }}>إضافة مرحلة دراسية</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 0.8fr auto', gap: 12, alignItems: 'end' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: 12, alignItems: 'end' }}>
           <Field label="اسم المرحلة">
             <input className="input" placeholder="مثال: السابع الأساسي" value={labelAr} onChange={(e) => setLabelAr(e.target.value)} required />
           </Field>
@@ -111,8 +124,14 @@ export default function AcademicStages() {
           <Field label="الفئة العمرية">
             <input className="input" placeholder="6–7 سنوات" value={ageRange} onChange={(e) => setAgeRange(e.target.value)} />
           </Field>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'end', marginTop: 12 }}>
           <Field label="الرسوم الشهرية (₪)">
             <input className="input" type="number" min="0" step="1" value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} dir="ltr" style={{ textAlign: 'right' }} />
+          </Field>
+          <Field label="حجز مقعد (₪)">
+            <input className="input" type="number" min="0" step="1" value={seatFee} onChange={(e) => setSeatFee(e.target.value)} dir="ltr" style={{ textAlign: 'right' }} placeholder="50" />
+            <div style={{ fontSize: 11, color: 'var(--color-neutral-500)', marginTop: 4 }}>اختياري — يُحصَّل عند قبول التسجيل · 0 = بدون حجز</div>
           </Field>
           <button type="submit" className="btn btn-primary" disabled={busy} style={{ height: 42 }}>
             <Icon name="add" size={14} /> إضافة
@@ -124,7 +143,7 @@ export default function AcademicStages() {
 
       <div className="card ah-table-wrap" style={{ padding: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderBottom: '1px solid var(--line)' }}>
-          <h4 style={{ margin: 0 }}>المراحل والرسوم الشهرية</h4>
+          <h4 style={{ margin: 0 }}>المراحل · الرسوم · حجز المقعد</h4>
           <span style={{ marginInlineStart: 'auto' }} />
           {stages.length === 0 && (
             <button type="button" className="btn btn-secondary" style={{ fontSize: 12 }} onClick={onSeed} disabled={busy}>
@@ -140,12 +159,13 @@ export default function AcademicStages() {
               <th>التصنيف</th>
               <th>العمر</th>
               <th>الرسوم الشهرية</th>
+              <th>حجز مقعد</th>
               <th>الحالة</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {stages.length === 0 && <EmptyRow colSpan={7}>لا توجد مراحل بعد — أضف مرحلة أو ازرع الافتراضية.</EmptyRow>}
+            {stages.length === 0 && <EmptyRow colSpan={8}>لا توجد مراحل بعد — أضف مرحلة أو ازرع الافتراضية.</EmptyRow>}
             {stages.map((s, i) => (
               <tr key={s.id} style={{ opacity: s.active === false ? 0.55 : 1 }}>
                 <td className="ah-tabnum">{(s.order ?? i) + 1}</td>
@@ -160,16 +180,33 @@ export default function AcademicStages() {
                   {editingId === s.id ? (
                     <input
                       className="input"
-                      style={{ fontSize: 13, padding: '4px 8px', width: 100 }}
+                      style={{ fontSize: 13, padding: '4px 8px', width: 90 }}
                       type="number"
                       dir="ltr"
                       value={editFee}
                       onChange={(e) => setEditFee(e.target.value)}
-                      placeholder="₪"
+                      placeholder="شهري"
                     />
                   ) : (
                     <span className="ah-tabnum" style={{ fontWeight: 600, color: 'var(--gold)' }}>
                       {s.monthlyTuitionMinorUnits != null ? formatILS(s.monthlyTuitionMinorUnits) : '— غير محدّد'}
+                    </span>
+                  )}
+                </td>
+                <td>
+                  {editingId === s.id ? (
+                    <input
+                      className="input"
+                      style={{ fontSize: 13, padding: '4px 8px', width: 90 }}
+                      type="number"
+                      dir="ltr"
+                      value={editSeat}
+                      onChange={(e) => setEditSeat(e.target.value)}
+                      placeholder="حجز"
+                    />
+                  ) : (
+                    <span className={`tag ${s.seatReservationMinorUnits > 0 ? 'tag-accent' : 'tag-neutral'}`} style={{ fontSize: 11 }}>
+                      {seatLabel(s.seatReservationMinorUnits)}
                     </span>
                   )}
                 </td>
@@ -196,6 +233,7 @@ export default function AcademicStages() {
                           setEditingId(s.id);
                           setEditLabel(s.labelAr);
                           setEditFee(s.monthlyTuitionMinorUnits != null ? String(s.monthlyTuitionMinorUnits / 100) : '');
+                          setEditSeat(s.seatReservationMinorUnits != null ? String(s.seatReservationMinorUnits / 100) : '0');
                         }}
                       >
                         تعديل / رسوم

@@ -7,6 +7,7 @@ import { EmptyRow, ErrorBanner } from '../../components/ui';
 import { useMyChildren } from '../../hooks/useMyChildren';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { formatILS } from '../../lib/constants';
+import { formatChargeTypeLabel, formatChargePeriodLabel } from '../../lib/chargeFilters';
 import { relativeDaysAr, relativeFromTimestamp } from '../../lib/relativeTime';
 import { demoBilling, demoPaymentProofs, demoStudentDetail } from '../../data/demo';
 import SubmitPaymentModal from '../../modals/SubmitPaymentModal';
@@ -24,7 +25,12 @@ function ChildCharges({ childId, demo }) {
   );
   const charges = useMemo(() => {
     const list = [...(chargesRaw || [])];
-    list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+    list.sort((a, b) => {
+      const pa = String(a.period || '');
+      const pb = String(b.period || '');
+      if (pa && pb && pa !== pb) return pa.localeCompare(pb);
+      return (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0);
+    });
     return list;
   }, [chargesRaw]);
 
@@ -32,14 +38,15 @@ function ChildCharges({ childId, demo }) {
 
   return (
     <div style={{ marginTop: 12 }}>
-      <div className="card-kicker" style={{ marginBottom: 6 }}>الفواتير</div>
+      <div className="card-kicker" style={{ marginBottom: 6 }}>الفواتير الشهرية</div>
       <div className="ah-table-wrap">
         <table className="table">
-          <thead><tr><th>النوع</th><th>المبلغ</th><th>الحالة</th></tr></thead>
+          <thead><tr><th>الشهر</th><th>الفاتورة</th><th>المبلغ</th><th>الحالة</th></tr></thead>
           <tbody>
             {charges.map((c) => (
               <tr key={c.id}>
-                <td>{c.type || '—'}</td>
+                <td style={{ fontSize: 13 }}>{formatChargePeriodLabel(c) || '—'}</td>
+                <td>{formatChargeTypeLabel(c)}</td>
                 <td className="ah-tabnum">{c.amount || formatILS(c.amountMinorUnits)}</td>
                 <td><span className="tag tag-outline">{c.status || '—'}</span></td>
               </tr>

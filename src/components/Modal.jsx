@@ -19,14 +19,16 @@ export default function Modal({ title, onClose, onSubmit, children, submitLabel 
         }}
         style={{ width: `min(${width}px, 100%)` }}
       >
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div className="dialog-header">
           <div className="dialog-title">{title}</div>
           <button type="button" onClick={close} className="btn btn-icon btn-ghost" style={{ marginInlineStart: 'auto' }} aria-label="إغلاق">
             <Icon name="close" size={18} />
           </button>
         </div>
-        {children}
-        {error && <div style={{ fontSize: 13, color: 'var(--color-accent-2-700)' }}>{error}</div>}
+        <div className="dialog-scroll">
+          {children}
+          {error && <div style={{ fontSize: 13, color: 'var(--color-accent-2-700)' }}>{error}</div>}
+        </div>
         <div className="dialog-actions">
           <button type="button" onClick={close} className="btn btn-secondary">إلغاء</button>
           <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? 'جارٍ الحفظ…' : submitLabel}</button>

@@ -6,7 +6,6 @@ import {
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
   browserLocalPersistence,
-  browserSessionPersistence,
   setPersistence,
 } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -16,13 +15,18 @@ import { issuePortalToken } from '../services/portalAuth';
 
 const AuthContext = createContext(null);
 
-async function emailSignIn(email, password, remember) {
-  await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+/** Always keep the Firebase session on this device (survives closing the tab/browser). */
+async function ensureLocalPersistence() {
+  await setPersistence(auth, browserLocalPersistence);
+}
+
+async function emailSignIn(email, password) {
+  await ensureLocalPersistence();
   return signInWithEmailAndPassword(auth, email, password);
 }
 
-async function portalSignIn(role, identifier, remember) {
-  await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+async function portalSignIn(role, identifier) {
+  await ensureLocalPersistence();
   const data = await issuePortalToken({ role, identifier });
   if (data?.mode === 'password' && data.email && data.password) {
     return signInWithEmailAndPassword(auth, data.email, data.password);
@@ -72,18 +76,18 @@ export function AuthProvider({ children }) {
     isFirebaseConfigured,
     can: (permissionKey) => hasPermission(profile, permissionKey),
 
-    // Staff — email + password
+    // Staff — email + password (session always persisted locally)
     signInAdmin: emailSignIn,
     signInTeacher: emailSignIn,
     signInAccountant: emailSignIn,
     signInReception: emailSignIn,
 
     // Parent / student — passwordless (phone or study ID)
-    async signInParent(phone, _passwordIgnored, remember) {
-      return portalSignIn('parent', phone, remember);
+    async signInParent(phone, _passwordIgnored) {
+      return portalSignIn('parent', phone);
     },
-    async signInStudent(studentId, _passwordIgnored, remember) {
-      return portalSignIn('student', studentId, remember);
+    async signInStudent(studentId, _passwordIgnored) {
+      return portalSignIn('student', studentId);
     },
     async resetPassword(email) {
       return sendPasswordResetEmail(auth, email);

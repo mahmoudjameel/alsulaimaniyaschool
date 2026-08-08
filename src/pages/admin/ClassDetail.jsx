@@ -24,6 +24,17 @@ export default function ClassDetail() {
   const [editing, setEditing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
   const teacher = teachers.find((t) => t.id === cls?.teacherId);
+  const classTeachers = useMemo(() => {
+    const ids = new Set([
+      ...(cls?.teacherIds || []),
+      ...(cls?.schedule || []).map((s) => s.teacherId).filter(Boolean),
+    ]);
+    if (cls?.teacherId) ids.add(cls.teacherId);
+    const fromProfiles = teachers.filter((t) => ids.has(t.id));
+    if (fromProfiles.length) return fromProfiles;
+    if (cls?.teacher) return [{ id: cls.teacherId || 'legacy', name: cls.teacher, subject: cls.subject }];
+    return [];
+  }, [cls, teachers]);
   const enrolledView = useMemo(() => filterByStudentSearch(enrolled, search), [enrolled, search]);
   const realCount = enrolled.length;
 
@@ -64,24 +75,32 @@ export default function ClassDetail() {
 
       <div className="ah-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 16, alignItems: 'start' }}>
         <div className="card">
-          <div className="card-title" style={{ marginBottom: 8 }}>المعلّم</div>
-          {teacher ? (
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--color-accent-100)', color: 'var(--color-accent-800)', display: 'grid', placeItems: 'center', fontFamily: 'var(--font-heading)', fontSize: 20, flex: 'none' }}>{teacher.initial || (teacher.name || 'م').charAt(0)}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15 }}>{teacher.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--gold)' }}>{teacher.subject}</div>
-              </div>
-            </div>
+          <div className="card-title" style={{ marginBottom: 8 }}>
+            {classTeachers.length > 1 ? 'المعلّمون' : 'المعلّم'}
+          </div>
+          {classTeachers.length === 0 ? (
+            <div style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>غير معيّن</div>
           ) : (
-            <div style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>{cls.teacher || 'غير معيّن'}</div>
-          )}
-          {!cls.teacherId && (
-            <div style={{ fontSize: 12, color: 'var(--color-accent-2-700)', marginTop: 8 }}>
-              لا يوجد teacherId — الصف لن يظهر في بوابة المعلّم. عدّل الصف وعيّن معلّماً بحساب دخول.
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {classTeachers.map((t) => (
+                <div key={t.id} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--color-accent-100)', color: 'var(--color-accent-800)', display: 'grid', placeItems: 'center', fontFamily: 'var(--font-heading)', fontSize: 16, flex: 'none' }}>
+                    {t.initial || (t.name || 'م').charAt(0)}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14 }}>{t.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--gold)' }}>{t.subject || ''}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-          {teacher && (
+          {!cls.teacherId && !(cls.teacherIds || []).length && (
+            <div style={{ fontSize: 12, color: 'var(--color-accent-2-700)', marginTop: 8 }}>
+              لا يوجد معلّم بحساب دخول — عيّن معلّمين على الحصص حتى يظهر الصف في بواباتهم.
+            </div>
+          )}
+          {teacher && classTeachers.length === 1 && (
             <Link to={`/admin/teachers/${teacher.id}`} className="btn btn-ghost" style={{ fontSize: 12, marginTop: 10, alignSelf: 'flex-start', textDecoration: 'none' }}>عرض ملف المعلّم ←</Link>
           )}
           <hr className="hr" />
@@ -89,9 +108,16 @@ export default function ClassDetail() {
           {(cls.schedule || []).length === 0 && <div style={{ fontSize: 13, color: 'var(--color-neutral-500)' }}>لم يُحدَّد جدول بعد — عدّل الصف لإضافته.</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {(cls.schedule || []).map((s, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}>
-                <span>{s.day}</span>
-                <span className="ah-tabnum" dir="ltr" style={{ color: 'var(--color-neutral-600)' }}>{s.start} – {s.end}</span>
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontWeight: 600 }}>{s.day}</span>
+                  <span className="ah-tabnum" dir="ltr" style={{ color: 'var(--color-neutral-600)' }}>{s.start} – {s.end}</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>
+                  {[s.subject || cls.subject, s.teacherName || (s.teacherId && teachers.find((t) => t.id === s.teacherId)?.name) || cls.teacher]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </div>
               </div>
             ))}
           </div>

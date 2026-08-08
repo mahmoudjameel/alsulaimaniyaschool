@@ -2,15 +2,18 @@ import { useMemo, useState } from 'react';
 import { where } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import { ErrorBanner } from '../../components/ui';
+import { useAuth } from '../../context/AuthContext';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { demoStaffUsers } from '../../data/demo';
 import {
   ROLE_LABELS, STAFF_ROLES, permissionsForUser, PERMISSIONS, ROLE_DEFAULT_PERMISSIONS,
 } from '../../lib/permissions';
 import NewStaffModal from '../../modals/NewStaffModal';
-import EditPermissionsModal from '../../modals/EditPermissionsModal';
+import EditUserModal from '../../modals/EditUserModal';
+import { deleteStaffAccount } from '../../services/users';
 
 export default function Users() {
+  const { profile } = useAuth();
   // Avoid orderBy + where('in') composite-index requirement: filter by role,
   // then sort names client-side so the page works even before indexes deploy.
   const { data: raw, error, demo } = useLiveOrDemo(
@@ -24,6 +27,8 @@ export default function Users() {
   );
   const [showNew, setShowNew] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [actionError, setActionError] = useState('');
 
   const errorHint = (() => {
     if (!error) return null;
@@ -37,16 +42,42 @@ export default function Users() {
     return 'تعذّر تحميل المستخدمين.';
   })();
 
+  const onDelete = async (u) => {
+    setActionError('');
+    if (demo) {
+      setActionError('وضع العرض التوضيحي: صِل Firebase لحذف الحسابات فعلياً.');
+      return;
+    }
+    if (u.id === profile?.id) {
+      setActionError('لا يمكنك حذف حسابك الحالي.');
+      return;
+    }
+    if (!window.confirm(`حذف حساب «${u.name}» نهائياً من النظام؟\nلن يتمكن من تسجيل الدخول بعد الحذف.`)) return;
+    setDeletingId(u.id);
+    try {
+      await deleteStaffAccount(u.id);
+    } catch (err) {
+      const msg = err?.message || '';
+      if (msg.includes('حسابك') || msg.includes('إدارة') || msg.includes('آخر')) {
+        setActionError(msg.replace(/^Firebase:\s*/i, '').replace(/\s*\([^)]*\)\s*$/, '') || msg);
+      } else {
+        setActionError('تعذّر حذف المستخدم.');
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <ErrorBanner>{errorHint}</ErrorBanner>
+      <ErrorBanner>{actionError}</ErrorBanner>
 
       <div className="card" style={{ gap: 8, background: 'var(--color-accent-100)', borderColor: 'color-mix(in srgb, var(--gold) 35%, transparent)' }}>
-        <div style={{ fontFamily: 'var(--font-heading)', fontSize: 17, fontWeight: 700 }}>الصلاحيات المخصّصة</div>
+        <div style={{ fontFamily: 'var(--font-heading)', fontSize: 17, fontWeight: 700 }}>المستخدمون والصلاحيات</div>
         <p style={{ margin: 0, fontSize: 13, lineHeight: 1.75, color: 'var(--color-neutral-700)' }}>
-          كل دور له صلاحيات افتراضية وشاشات ظاهرة في القائمة.
-          دور <strong>المديرة</strong> يدخل لوحة الإدارة بصلاحيات طلاب/أكاديمي افتراضياً (بدون مالية كاملة وبدون مستخدمين أو نسخ احتياطي).
-          من «تعديل الصلاحيات» فعّلي أو ألغِ أي شاشة لكل شخص.
+          أنشئ حسابات الدخول، وعدّل الاسم والبريد وكلمة المرور والدور والصلاحيات، أو احذف الحساب عند الحاجة.
+          حساب الإدارة يملك كل الصلاحيات ولا يُحذف إن كان الوحيد.
         </p>
       </div>
 
@@ -83,6 +114,7 @@ export default function Users() {
               const granted = PERMISSIONS.filter((p) => perms[p.key]);
               const extras = granted.filter((p) => !defaults[p.key]);
               const revoked = PERMISSIONS.filter((p) => defaults[p.key] && !perms[p.key]);
+              const isSelf = u.id === profile?.id;
 
               return (
                 <tr key={u.id || i}>
@@ -119,9 +151,19 @@ export default function Users() {
                       </div>
                     )}
                   </td>
-                  <td style={{ textAlign: 'left' }}>
+                  <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>
                     <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setEditing(u)}>
-                      تعديل الصلاحيات
+                      تعديل
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      style={{ fontSize: 12, color: isSelf ? undefined : 'var(--color-danger, #b42318)' }}
+                      disabled={isSelf || deletingId === u.id}
+                      title={isSelf ? 'لا يمكن حذف حسابك الحالي' : 'حذف الحساب'}
+                      onClick={() => onDelete(u)}
+                    >
+                      {deletingId === u.id ? 'جارٍ…' : 'حذف'}
                     </button>
                   </td>
                 </tr>
@@ -132,7 +174,7 @@ export default function Users() {
       </div>
 
       {showNew && <NewStaffModal demo={demo} onClose={() => setShowNew(false)} />}
-      {editing && <EditPermissionsModal user={editing} demo={demo} onClose={() => setEditing(null)} />}
+      {editing && <EditUserModal user={editing} demo={demo} onClose={() => setEditing(null)} />}
     </div>
   );
 }

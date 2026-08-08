@@ -10,6 +10,7 @@ import {
   SHOW_FAMILY_PORTALS,
 } from '../lib/constants';
 import { isValidLocalMobile, toE164Display } from '../lib/phone';
+import { homePathForRole, loadLastLogin, saveLastLogin } from '../lib/loginMemory';
 
 const ALL_ROLE_TABS = [
   { id: 'admin', label: 'الإدارة', icon: 'dashboard' },
@@ -26,13 +27,13 @@ const ROLE_TABS = ALL_ROLE_TABS.filter((r) => SHOW_FAMILY_PORTALS || !r.family);
 const STAFF_ROLES = new Set(['admin', 'director', 'teacher', 'accountant', 'reception']);
 
 const META = {
-  admin: { title: 'لوحة الإدارة', sub: 'دخول حساب الإدارة', ph: `admin@${SCHOOL_EMAIL_DOMAIN}`, idLabel: 'البريد الإلكتروني', hint: 'يتطلّب كلمة مرور' },
-  director: { title: 'دخول المديرة', sub: 'لوحة الإدارة بصلاحيات مخصّصة', ph: `director@${SCHOOL_EMAIL_DOMAIN}`, idLabel: 'البريد الإلكتروني', hint: 'يتطلّب كلمة مرور' },
-  teacher: { title: 'دخول المعلّم', sub: 'صفوفك والحضور والدرجات', ph: `teacher@${SCHOOL_EMAIL_DOMAIN}`, idLabel: 'البريد الإلكتروني', hint: 'يتطلّب كلمة مرور' },
-  accountant: { title: 'دخول المحاسب', sub: 'الفواتير والمدفوعات والرواتب', ph: `accountant@${SCHOOL_EMAIL_DOMAIN}`, idLabel: 'البريد الإلكتروني', hint: 'يتطلّب كلمة مرور' },
-  reception: { title: 'دخول الاستقبال', sub: 'القبول وملفات الطلاب', ph: `reception@${SCHOOL_EMAIL_DOMAIN}`, idLabel: 'البريد الإلكتروني', hint: 'يتطلّب كلمة مرور' },
-  parent: { title: 'دخول ولي الأمر', sub: 'برقم الجوال المسجّل لدى المدرسة', ph: '0592 799 888', idLabel: 'رقم الجوال', hint: 'بدون كلمة مرور' },
-  student: { title: 'دخول الطالب', sub: 'بالرقم الدراسي فقط', ph: '1227', idLabel: 'الرقم الدراسي', hint: 'بدون كلمة مرور' },
+  admin: { title: 'لوحة الإدارة', sub: 'دخول حساب الإدارة', ph: `admin@${SCHOOL_EMAIL_DOMAIN}`, idLabel: 'البريد الإلكتروني', hint: 'الجلسة تُحفظ على هذا الجهاز — لن تحتاجي تسجيل الدخول في كل مرة' },
+  director: { title: 'دخول المديرة', sub: 'لوحة الإدارة بصلاحيات مخصّصة', ph: `director@${SCHOOL_EMAIL_DOMAIN}`, idLabel: 'البريد الإلكتروني', hint: 'الجلسة تُحفظ على هذا الجهاز — لن تحتاجي تسجيل الدخول في كل مرة' },
+  teacher: { title: 'دخول المعلّم', sub: 'صفوفك والحضور والدرجات', ph: `teacher@${SCHOOL_EMAIL_DOMAIN}`, idLabel: 'البريد الإلكتروني', hint: 'الجلسة تُحفظ على هذا الجهاز — لن تحتاج تسجيل الدخول في كل مرة' },
+  accountant: { title: 'دخول المحاسب', sub: 'الفواتير والمدفوعات والرواتب', ph: `accountant@${SCHOOL_EMAIL_DOMAIN}`, idLabel: 'البريد الإلكتروني', hint: 'الجلسة تُحفظ على هذا الجهاز — لن تحتاج تسجيل الدخول في كل مرة' },
+  reception: { title: 'دخول الاستقبال', sub: 'القبول وملفات الطلاب', ph: `reception@${SCHOOL_EMAIL_DOMAIN}`, idLabel: 'البريد الإلكتروني', hint: 'الجلسة تُحفظ على هذا الجهاز — لن تحتاج تسجيل الدخول في كل مرة' },
+  parent: { title: 'دخول ولي الأمر', sub: 'برقم الجوال المسجّل لدى المدرسة', ph: '0592 799 888', idLabel: 'رقم الجوال', hint: 'بدون كلمة مرور · الجلسة تُحفظ على الجهاز' },
+  student: { title: 'دخول الطالب', sub: 'بالرقم الدراسي فقط', ph: '1227', idLabel: 'الرقم الدراسي', hint: 'بدون كلمة مرور · الجلسة تُحفظ على الجهاز' },
 };
 
 const DEST = {
@@ -66,6 +67,25 @@ const SIGN_IN_FN = {
   student: 'signInStudent',
 };
 
+function initialFieldsForRole(role) {
+  const saved = loadLastLogin();
+  if (!saved) return { id: '', phoneDial: '970', phoneLocal: '' };
+  if (role === 'parent') {
+    return {
+      id: '',
+      phoneDial: saved.phoneDial || '970',
+      phoneLocal: saved.phoneLocal || '',
+    };
+  }
+  if (role === 'student') {
+    return { id: saved.studentId || '', phoneDial: '970', phoneLocal: '' };
+  }
+  if (saved.role === role || (STAFF_ROLES.has(role) && saved.email)) {
+    return { id: saved.email || '', phoneDial: '970', phoneLocal: '' };
+  }
+  return { id: '', phoneDial: '970', phoneLocal: '' };
+}
+
 export default function Login() {
   const { role: routeRole } = useParams();
   const navigate = useNavigate();
@@ -80,16 +100,37 @@ export default function Login() {
   const role = ROLE_TABS.some((r) => r.id === routeRole) ? routeRole : 'admin';
   const needsPassword = STAFF_ROLES.has(role);
 
-  const [id, setId] = useState('');
+  const initial = initialFieldsForRole(role);
+  const [id, setId] = useState(initial.id);
   const [password, setPassword] = useState('');
-  const [phoneDial, setPhoneDial] = useState('970');
-  const [phoneLocal, setPhoneLocal] = useState('');
-  const [remember, setRemember] = useState(true);
+  const [phoneDial, setPhoneDial] = useState(initial.phoneDial);
+  const [phoneLocal, setPhoneLocal] = useState(initial.phoneLocal);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [resetSent, setResetSent] = useState(false);
 
   const meta = META[role];
+
+  // Restore session: if already signed in for this portal, skip the form.
+  useEffect(() => {
+    if (!auth.isFirebaseConfigured || auth.loading) return;
+    if (!auth.firebaseUser || !auth.role) return;
+    const allowed = TAB_ALLOWED_ROLES[role] || [role];
+    if (allowed.includes(auth.role)) {
+      navigate(homePathForRole(auth.role), { replace: true });
+    }
+  }, [auth.isFirebaseConfigured, auth.loading, auth.firebaseUser, auth.role, role, navigate]);
+
+  // When switching role tabs, refill remembered identifier for that role.
+  useEffect(() => {
+    const next = initialFieldsForRole(role);
+    setId(next.id);
+    setPhoneDial(next.phoneDial);
+    setPhoneLocal(next.phoneLocal);
+    setPassword('');
+    setError('');
+    setResetSent(false);
+  }, [role]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -122,7 +163,7 @@ export default function Login() {
 
     setSubmitting(true);
     try {
-      await auth[SIGN_IN_FN[role]](identifier, password, remember);
+      await auth[SIGN_IN_FN[role]](identifier, password);
       if (auth.isFirebaseConfigured) {
         const uid = firebaseAuth.currentUser?.uid;
         if (!uid) throw new Error('no-user');
@@ -134,6 +175,13 @@ export default function Login() {
           setError('هذا الحساب لا ينتمي لهذا المدخل. اختري الواجهة المناسبة لدورك.');
           return;
         }
+        saveLastLogin({
+          role: actualRole,
+          email: needsPassword ? identifier : null,
+          phoneDial: role === 'parent' ? phoneDial : null,
+          phoneLocal: role === 'parent' ? phoneLocal : null,
+          studentId: role === 'student' ? identifier : null,
+        });
         navigate(DEST[actualRole] || DEST[role]);
       } else {
         navigate(DEST[role]);
@@ -156,14 +204,13 @@ export default function Login() {
     }
   };
 
-  const resetForm = () => {
-    setError('');
-    setResetSent(false);
-    setId('');
-    setPassword('');
-    setPhoneLocal('');
-    setPhoneDial('970');
-  };
+  if (auth.isFirebaseConfigured && (auth.loading || (auth.firebaseUser && auth.role && (TAB_ALLOWED_ROLES[role] || [role]).includes(auth.role)))) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: 'var(--color-neutral-600)', fontSize: 14 }}>
+        جارٍ استعادة الجلسة…
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr 1fr' }} className="ah-login">
@@ -202,7 +249,7 @@ export default function Login() {
                 key={r.id}
                 className="ah-roletab"
                 data-active={role === r.id}
-                onClick={() => { resetForm(); navigate(`/login/${r.id}`); }}
+                onClick={() => navigate(`/login/${r.id}`)}
                 type="button"
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '12px 4px', border: 0, background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--color-neutral-600)', borderBottom: '2px solid transparent' }}
               >
@@ -247,7 +294,7 @@ export default function Login() {
                     onChange={(e) => setId(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
                     required
                     inputMode="numeric"
-                    autoComplete="off"
+                    autoComplete="username"
                     aria-label="الرقم الدراسي بدون البادئة"
                   />
                 </div>
@@ -258,7 +305,7 @@ export default function Login() {
             ) : (
               <div className="field">
                 <label>{meta.idLabel}</label>
-                <input className="input" placeholder={meta.ph} dir="ltr" style={{ textAlign: 'right' }} value={id} onChange={(e) => setId(e.target.value)} required autoComplete={needsPassword ? 'username' : 'off'} />
+                <input className="input" placeholder={meta.ph} dir="ltr" style={{ textAlign: 'right' }} value={id} onChange={(e) => setId(e.target.value)} required autoComplete="username" />
               </div>
             )}
 
@@ -270,9 +317,7 @@ export default function Login() {
             )}
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <label className="radio" style={{ margin: 0 }}>
-                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /><span className="dot" /> تذكّرني
-              </label>
+              <span style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>الجلسة تبقى محفوظة على هذا الجهاز</span>
               {needsPassword && (
                 <button type="button" onClick={onForgotPassword} className="ah-tablink" style={{ fontSize: 13, color: 'var(--gold)' }}>نسيت كلمة المرور؟</button>
               )}
@@ -295,8 +340,10 @@ export default function Login() {
 }
 
 function mapAuthError(err, role) {
-  const code = err?.code || '';
-  const msg = err?.message || '';
+  const code = String(err?.code || '');
+  const msg = String(err?.message || err?.customData?.message || '');
+  const blob = `${code} ${msg}`.toLowerCase();
+
   if (code === 'functions/not-found' || msg.includes('not-found')) {
     return role === 'parent'
       ? 'لا يوجد أبناء مرتبطون بهذا الرقم. تأكد من الجوال المسجّل لدى المدرسة.'
@@ -305,11 +352,26 @@ function mapAuthError(err, role) {
   if (code === 'functions/invalid-argument' || msg.includes('invalid-argument')) {
     return role === 'parent' ? 'أدخل رقم جوال صحيح مثل 0592799888.' : 'أدخل الرقم الدراسي (مثل 1227).';
   }
-  if (code.includes('user-not-found') || code.includes('invalid-credential') || code.includes('wrong-password')) {
-    return 'بيانات الدخول غير صحيحة. تحقّق من البريد وكلمة المرور.';
+  if (
+    blob.includes('invalid-credential')
+    || blob.includes('wrong-password')
+    || blob.includes('user-not-found')
+    || blob.includes('invalid_login_credentials')
+    || blob.includes('invalid_password')
+    || blob.includes('email_not_found')
+    || blob.includes('invalid-email')
+  ) {
+    if (role === 'parent' || role === 'student') {
+      return 'تعذّر إتمام الدخول. تحقّق من الرقم وحاول مجدداً.';
+    }
+    return 'البريد أو كلمة المرور غير صحيحة. تأكد من كتابتهما بدقة، أو استخدم «نسيت كلمة المرور».';
   }
-  if (code.includes('too-many-requests')) return 'محاولات كثيرة — حاول لاحقاً.';
-  if (code.includes('network-request-failed')) return 'تعذّر الاتصال بالخادم. تحقّق من الإنترنت.';
+  if (blob.includes('user-disabled')) return 'هذا الحساب موقّف. تواصل مع الإدارة.';
+  if (blob.includes('too-many-requests')) return 'محاولات كثيرة — حاول لاحقاً.';
+  if (blob.includes('network-request-failed')) return 'تعذّر الاتصال بالخادم. تحقّق من الإنترنت.';
+  if (blob.includes('operation-not-allowed') || blob.includes('password_login_disabled')) {
+    return 'تسجيل الدخول بالبريد غير مفعّل في إعدادات Firebase.';
+  }
   if (/internal/i.test(code) || /^INTERNAL$/i.test(msg.trim()) || msg.includes('INTERNAL')) {
     return 'تعذّر تسجيل الدخول حالياً. حاول مجدداً بعد لحظات.';
   }

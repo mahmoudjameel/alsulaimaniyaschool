@@ -1,15 +1,17 @@
 import { useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { orderBy } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import SearchInput from '../../components/SearchInput';
 import { SegmentedTabs, EmptyRow, ErrorBanner } from '../../components/ui';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
+import { useAcademicStages } from '../../hooks/useAcademicStages';
 import { demoAdmissions } from '../../data/demo';
 import { acceptAdmission, rejectAdmission } from '../../services/admissions';
 import { relativeDaysAr, relativeFromTimestamp } from '../../lib/relativeTime';
 import { staffPortalBase } from '../../lib/portalPaths';
 import { matchesStudentSearch } from '../../lib/studentSearch';
+import { formatILS } from '../../lib/constants';
 
 const TABS = [
   { id: 'review', label: 'قيد المراجعة' },
@@ -26,6 +28,22 @@ export default function Admissions() {
   const [demoOverrides, setDemoOverrides] = useState({});
   const [busyId, setBusyId] = useState(null);
   const { data, demo, error } = useLiveOrDemo('admissions', [orderBy('createdAt', 'desc')], demoAdmissions);
+  const { stages } = useAcademicStages();
+  const seatByStageId = useMemo(() => {
+    const map = new Map();
+    (stages || []).forEach((s) => {
+      map.set(s.id, Number(s.seatReservationMinorUnits) || 0);
+      if (s.labelAr) map.set(s.labelAr, Number(s.seatReservationMinorUnits) || 0);
+    });
+    return map;
+  }, [stages]);
+
+  const seatForRow = (r) => {
+    if (r.stageId && seatByStageId.has(r.stageId)) return seatByStageId.get(r.stageId);
+    const key = r.stageLabel || r.grade;
+    if (key && seatByStageId.has(key)) return seatByStageId.get(key);
+    return 0;
+  };
 
   const rows = useMemo(() => data.map((r) => (
     demo && demoOverrides[r.id] ? { ...r, status: demoOverrides[r.id] } : r
@@ -120,7 +138,16 @@ export default function Admissions() {
                   {r.residentialAddress || '—'}
                 </td>
                 <td className="ah-tabnum">{r.nationalId || '—'}</td>
-                <td>{r.grade}</td>
+                <td>
+                  <div>{r.grade}</div>
+                  {seatForRow(r) > 0 && (
+                    <div style={{ marginTop: 4 }}>
+                      <span className="tag tag-accent" style={{ fontSize: 10 }}>
+                        حجز مقعد: {formatILS(seatForRow(r))}
+                      </span>
+                    </div>
+                  )}
+                </td>
                 <td className="ah-tabnum">{r.phone}</td>
                 <td><span className="tag tag-neutral">{r.source}</span></td>
                 <td className="ah-tabnum" style={{ color: 'var(--color-neutral-500)' }}>

@@ -85,7 +85,7 @@ export default function StudentToday() {
               <div className="stu-day-top">
                 <div>
                   <div className="stu-list-title">{row.title}</div>
-                  {row.subject && <div className="stu-list-sub">{row.subject}</div>}
+                  {row.subject && <div className="stu-list-sub">{row.subject}{row.teacherName ? ` · ${row.teacherName}` : ''}</div>}
                 </div>
                 <span className="stu-day-time" dir="ltr">{row.when}</span>
               </div>

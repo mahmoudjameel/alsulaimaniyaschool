@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { AppearanceProvider } from './context/FontThemeContext';
 import RequireRole from './components/RequireRole';
 import RequirePermission from './components/RequirePermission';
 
@@ -12,6 +13,7 @@ import Admissions from './pages/admin/Admissions';
 import Students from './pages/admin/Students';
 import AcademicStages from './pages/admin/AcademicStages';
 import StudentProfile from './pages/admin/StudentProfile';
+import SeatReservations from './pages/SeatReservations';
 import Billing from './pages/admin/Billing';
 import PaymentProofs from './pages/PaymentProofs';
 import Payroll from './pages/admin/Payroll';
@@ -19,6 +21,7 @@ import Staff from './pages/admin/Staff';
 import StaffAttendance from './pages/admin/StaffAttendance';
 import SchoolSite from './pages/admin/SchoolSite';
 import AcademicYear from './pages/admin/AcademicYear';
+import Appearance from './pages/admin/Appearance';
 import Disbursements from './pages/Disbursements';
 import Expenses from './pages/admin/Expenses';
 import FeeAid from './pages/FeeAid';
@@ -112,8 +115,9 @@ import Register from './pages/public/Register';
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
+      <AppearanceProvider>
+        <BrowserRouter>
+          <Routes>
           <Route path="/" element={<Launcher />} />
           <Route path="/login/:role" element={<Login />} />
 
@@ -124,6 +128,7 @@ export default function App() {
             <Route path="stages" element={<AcademicStages />} />
             <Route path="students/:id" element={<StudentProfile />} />
             <Route path="billing" element={<Billing />} />
+            <Route path="seat-reservations" element={<SeatReservations />} />
             <Route path="payments" element={<PaymentProofs />} />
             <Route path="fee-aid" element={<FeeAid />} />
             <Route path="finance-report" element={<FinanceReport />} />
@@ -134,6 +139,7 @@ export default function App() {
             <Route path="staff-attendance" element={<StaffAttendance />} />
             <Route path="school-site" element={<SchoolSite />} />
             <Route path="academic-year" element={<AcademicYear />} />
+            <Route path="appearance" element={<Appearance />} />
             <Route path="disbursements" element={<Disbursements />} />
             <Route path="expenses" element={<Expenses />} />
             <Route path="classes" element={<Classes />} />
@@ -181,6 +187,7 @@ export default function App() {
             <Route index element={<AccountantDashboard />} />
             <Route path="punch" element={<AccountantPunch />} />
             <Route path="invoices" element={<AccountantInvoices />} />
+            <Route path="seat-reservations" element={<SeatReservations />} />
             <Route path="payments" element={<PaymentProofs />} />
             <Route path="fee-aid" element={<FeeAid />} />
             <Route path="finance-report" element={<FinanceReport />} />
@@ -246,7 +253,8 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </BrowserRouter>
+        </BrowserRouter>
+      </AppearanceProvider>
     </AuthProvider>
   );
 }

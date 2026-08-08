@@ -5,12 +5,23 @@ export const STAFF_ROLE_TYPES = [
   { id: 'teacher', label: 'معلّم / معلّمة' },
   { id: 'accountant', label: 'محاسب / مالية' },
   { id: 'reception', label: 'استقبال / تسجيل' },
+  { id: 'director', label: 'مديرة' },
   { id: 'admin', label: 'إدارة / سكرتارية' },
   { id: 'cleaner', label: 'نظافة' },
   { id: 'utilities', label: 'صيانة / طاقة / مرافق' },
   { id: 'guard', label: 'حراسة' },
   { id: 'other', label: 'أخرى' },
 ];
+
+/**
+ * Roles that already have (or get) a system login — pick from users list,
+ * or create a new account when adding from الموظفون والأجور.
+ */
+export const PORTAL_STAFF_ROLE_TYPES = ['teacher', 'accountant', 'reception', 'director'];
+
+export function isPortalStaffRole(roleType) {
+  return PORTAL_STAFF_ROLE_TYPES.includes(roleType);
+}
 
 export const SALARY_TYPES = [
   { id: 'monthly', label: 'راتب شهري', legacy: 'راتب شهري' },

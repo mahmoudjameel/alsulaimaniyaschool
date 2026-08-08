@@ -5,6 +5,8 @@ import {
   DEFAULT_SCHOOL_LAT,
   DEFAULT_SCHOOL_LNG,
 } from '../lib/geo';
+import { DEFAULT_FONT_THEME, isValidFontTheme } from '../lib/fonts';
+import { DEFAULT_COLOR_THEME, isValidColorTheme } from '../lib/colorThemes';
 import { SCHOOL_LOCATION_AR, SCHOOL_NAME_AR } from '../lib/constants';
 
 export const SCHOOL_SETTINGS_DOC = 'main';
@@ -25,6 +27,8 @@ export function defaultSchoolSite() {
     punchEnabled: true,
     workdayStart: '07:30',
     workdayEnd: '14:00',
+    fontTheme: DEFAULT_FONT_THEME,
+    colorTheme: DEFAULT_COLOR_THEME,
     notes: '',
   };
 }
@@ -55,6 +59,32 @@ export async function saveSchoolSite(payload, actor) {
     workdayStart: payload.workdayStart || '07:30',
     workdayEnd: payload.workdayEnd || '14:00',
     notes: (payload.notes || '').trim() || null,
+    updatedAt: serverTimestamp(),
+    updatedBy: actor?.uid || null,
+    updatedByName: actor?.name || null,
+  }, { merge: true });
+}
+
+/** Persist school-wide font + color themes. */
+export async function saveAppearance({ fontTheme, colorTheme }, actor) {
+  if (!isValidFontTheme(fontTheme)) throw new Error('INVALID_FONT');
+  if (!isValidColorTheme(colorTheme)) throw new Error('INVALID_COLOR');
+  await setDoc(schoolSettingsRef(), {
+    fontTheme,
+    colorTheme,
+    appearanceUpdatedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    updatedBy: actor?.uid || null,
+    updatedByName: actor?.name || null,
+  }, { merge: true });
+}
+
+/** @deprecated use saveAppearance */
+export async function saveFontTheme(fontTheme, actor) {
+  if (!isValidFontTheme(fontTheme)) throw new Error('INVALID_FONT');
+  await setDoc(schoolSettingsRef(), {
+    fontTheme,
+    fontThemeUpdatedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     updatedBy: actor?.uid || null,
     updatedByName: actor?.name || null,

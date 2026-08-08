@@ -1,8 +1,10 @@
-import { addDoc, collection, doc, increment, runTransaction, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, increment, runTransaction, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { db, functions, storage } from '../firebase/config';
 import { shekelsToMinorUnits } from '../lib/constants';
+import { academicTuitionPeriods } from '../lib/billingPeriods';
+import { isSeatReservationType, SEAT_RESERVATION_TYPE } from '../lib/feeTypes';
 import { logActivity } from './activity';
 
 export const paymentProofsCol = collection(db, 'paymentProofs');
@@ -19,7 +21,89 @@ export async function generateInvoices(period) {
 }
 
 export async function confirmCharge(chargeId) {
-  await updateDoc(doc(db, 'charges', chargeId), { status: 'مؤكَّد' });
+  await updateDoc(doc(db, 'charges', chargeId), { status: 'مؤكَّد', updatedAt: serverTimestamp() });
+}
+
+/**
+ * Edit an existing charge. Adjusts student balance when amount changes
+ * (same net-debit model as createManualCharge).
+ */
+export async function updateCharge(chargeId, patch = {}) {
+  const chargeRef = doc(db, 'charges', chargeId);
+  const today = new Date().toISOString().slice(0, 10);
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(chargeRef);
+    if (!snap.exists()) throw new Error('not found');
+    const prev = snap.data();
+    const studentId = prev.studentId;
+    if (!studentId) throw new Error('no student');
+
+    const nextAmount = patch.amountMinorUnits != null
+      ? Number(patch.amountMinorUnits)
+      : Number(prev.amountMinorUnits || 0);
+    const nextDiscount = patch.discountMinorUnits != null
+      ? Number(patch.discountMinorUnits)
+      : Number(prev.discountMinorUnits || 0);
+    const amountDelta = nextAmount - Number(prev.amountMinorUnits || 0);
+
+    const allowed = {
+      updatedAt: serverTimestamp(),
+    };
+    if (patch.type != null) allowed.type = patch.type;
+    if (patch.status != null) allowed.status = patch.status;
+    if (patch.method != null) allowed.method = patch.method;
+    if (patch.amountMinorUnits != null) allowed.amountMinorUnits = nextAmount;
+    if (patch.discountMinorUnits != null) allowed.discountMinorUnits = Math.max(0, nextDiscount);
+
+    tx.update(chargeRef, allowed);
+
+    if (amountDelta !== 0) {
+      tx.update(doc(db, 'students', studentId), {
+        balanceMinorUnits: increment(amountDelta),
+      });
+      tx.set(doc(collection(db, 'students', studentId, 'ledger')), {
+        date: today,
+        item: amountDelta > 0
+          ? `تعديل فاتورة (+${amountDelta / 100} ₪) — ${patch.type || prev.type}`
+          : `تعديل فاتورة (${amountDelta / 100} ₪) — ${patch.type || prev.type}`,
+        debitMinorUnits: amountDelta > 0 ? amountDelta : 0,
+        creditMinorUnits: amountDelta < 0 ? -amountDelta : 0,
+        chargeId,
+        createdAt: serverTimestamp(),
+      });
+    }
+  });
+}
+
+/** Delete a charge and reverse its debit on the student balance. */
+export async function deleteCharge(chargeId) {
+  const chargeRef = doc(db, 'charges', chargeId);
+  const today = new Date().toISOString().slice(0, 10);
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(chargeRef);
+    if (!snap.exists()) return;
+    const prev = snap.data();
+    const amount = Number(prev.amountMinorUnits || 0);
+    const studentId = prev.studentId;
+
+    tx.delete(chargeRef);
+
+    if (studentId && amount) {
+      tx.update(doc(db, 'students', studentId), {
+        balanceMinorUnits: increment(-amount),
+      });
+      tx.set(doc(collection(db, 'students', studentId, 'ledger')), {
+        date: today,
+        item: `حذف فاتورة — ${prev.type || 'فاتورة'}`,
+        debitMinorUnits: 0,
+        creditMinorUnits: amount,
+        chargeId,
+        createdAt: serverTimestamp(),
+      });
+    }
+  });
 }
 
 /**
@@ -35,6 +119,37 @@ export async function createManualCharge({
 }) {
   const amountMinorUnits = shekelsToMinorUnits(amountShekels);
   const today = new Date().toISOString().slice(0, 10);
+
+  // Seat reservation is one-per-student and must stay separate from monthly tuition.
+  if (isSeatReservationType(type)) {
+    const chargeId = await createSeatReservationCharge({
+      studentId,
+      studentName,
+      stageId,
+      stageLabel,
+      classSection,
+      grade,
+      amountMinorUnits,
+      status: 'مؤكَّد',
+      method: method || 'يدوي',
+    });
+    if (receiptFile && chargeId) {
+      const path = `students/${studentId}/receipts/${Date.now()}-${receiptFile.name}`;
+      const fileRef = ref(storage, path);
+      await uploadBytes(fileRef, receiptFile);
+      const receiptUrl = await getDownloadURL(fileRef);
+      await updateDoc(doc(db, 'charges', chargeId), { receiptUrl, updatedAt: serverTimestamp() });
+      await addDoc(collection(db, 'students', studentId, 'documents'), {
+        name: `إيصال — ${SEAT_RESERVATION_TYPE}`,
+        type: receiptFile.type.includes('pdf') ? 'PDF' : 'صورة',
+        date: today,
+        status: 'موثّق',
+        tone: 'accent',
+        url: receiptUrl,
+      });
+    }
+    return chargeId;
+  }
 
   let receiptUrl = null;
   if (receiptFile) {
@@ -74,6 +189,157 @@ export async function createManualCharge({
   });
 }
 
+/**
+ * Seat reservation fee for a stage — one charge per student
+ * (`{studentId}_seat_reservation`), separate from monthly tuition.
+ * Idempotent create; optional patch for status/method/amount on existing.
+ */
+export async function createSeatReservationCharge({
+  studentId, studentName, stageId, stageLabel, amountMinorUnits,
+  classSection, grade, status, method,
+}) {
+  const amount = Number(amountMinorUnits) || 0;
+  if (!studentId || amount <= 0) return null;
+
+  const chargeId = `${studentId}_seat_reservation`;
+  const chargeRef = doc(db, 'charges', chargeId);
+  const today = new Date().toISOString().slice(0, 10);
+
+  await runTransaction(db, async (tx) => {
+    const existing = await tx.get(chargeRef);
+    if (existing.exists()) {
+      const prev = existing.data();
+      const patch = { updatedAt: serverTimestamp() };
+      if (status != null) patch.status = status;
+      if (method != null) patch.method = method;
+      if (amount !== Number(prev.amountMinorUnits || 0)) {
+        const delta = amount - Number(prev.amountMinorUnits || 0);
+        patch.amountMinorUnits = amount;
+        if (delta !== 0) {
+          tx.update(doc(db, 'students', studentId), { balanceMinorUnits: increment(delta) });
+          tx.set(doc(collection(db, 'students', studentId, 'ledger')), {
+            date: today,
+            item: delta > 0 ? `تعديل حجز مقعد (+${delta / 100} ₪)` : `تعديل حجز مقعد (${delta / 100} ₪)`,
+            debitMinorUnits: delta > 0 ? delta : 0,
+            creditMinorUnits: delta < 0 ? -delta : 0,
+            chargeId,
+            createdAt: serverTimestamp(),
+          });
+        }
+      }
+      tx.update(chargeRef, patch);
+      return;
+    }
+    tx.set(chargeRef, {
+      studentId,
+      student: studentName || '—',
+      type: 'حجز مقعد',
+      amountMinorUnits: amount,
+      discountMinorUnits: 0,
+      status: status || 'مسودّة',
+      method: method || '—',
+      stageId: stageId || null,
+      stageLabel: stageLabel || null,
+      classSection: classSection || null,
+      grade: grade || stageLabel || null,
+      createdAt: serverTimestamp(),
+    });
+    tx.set(doc(collection(db, 'students', studentId, 'ledger')), {
+      date: today,
+      item: `حجز مقعد${stageLabel ? ` — ${stageLabel}` : ''}`,
+      debitMinorUnits: amount,
+      creditMinorUnits: 0,
+      chargeId,
+      createdAt: serverTimestamp(),
+    });
+    tx.update(doc(db, 'students', studentId), { balanceMinorUnits: increment(amount) });
+  });
+  return chargeId;
+}
+
+/**
+ * Create 10 monthly tuition draft charges for the academic year
+ * (same doc ids as generateInvoices: `{studentId}_{YYYY-MM}_tuition`).
+ * Idempotent — skips periods that already exist.
+ */
+export async function createAcademicYearTuitionPlan({
+  studentId,
+  studentName,
+  stageId,
+  stageLabel,
+  classSection,
+  grade,
+  academicYear,
+  monthlyTuitionMinorUnits,
+}) {
+  const monthly = Number(monthlyTuitionMinorUnits) || 0;
+  if (!studentId || monthly <= 0) {
+    return { created: 0, skipped: 0, periods: [], monthlyMinorUnits: 0 };
+  }
+
+  const periods = academicTuitionPeriods(academicYear);
+  const today = new Date().toISOString().slice(0, 10);
+  let created = 0;
+  let skipped = 0;
+  const createdPeriods = [];
+
+  for (const { period, labelAr } of periods) {
+    const chargeId = `${studentId}_${period}_tuition`;
+    const chargeRef = doc(db, 'charges', chargeId);
+    let didCreate = false;
+    // eslint-disable-next-line no-await-in-loop
+    await runTransaction(db, async (tx) => {
+      didCreate = false;
+      const existing = await tx.get(chargeRef);
+      if (existing.exists()) return;
+      tx.set(chargeRef, {
+        studentId,
+        student: studentName || '—',
+        period,
+        periodLabel: labelAr,
+        type: 'رسوم دراسية شهرية',
+        amountMinorUnits: monthly,
+        discountMinorUnits: 0,
+        status: 'مسودّة',
+        method: '—',
+        stageId: stageId || null,
+        stageLabel: stageLabel || null,
+        classSection: classSection || null,
+        grade: grade || stageLabel || null,
+        academicYear: academicYear || null,
+        createdAt: serverTimestamp(),
+      });
+      tx.set(doc(collection(db, 'students', studentId, 'ledger')), {
+        date: today,
+        item: `رسوم دراسية — ${labelAr}`,
+        debitMinorUnits: monthly,
+        creditMinorUnits: 0,
+        chargeId,
+        period,
+        createdAt: serverTimestamp(),
+      });
+      tx.update(doc(db, 'students', studentId), {
+        balanceMinorUnits: increment(monthly),
+      });
+      didCreate = true;
+    });
+    if (didCreate) {
+      created += 1;
+      createdPeriods.push({ period, labelAr, amountMinorUnits: monthly });
+    } else {
+      skipped += 1;
+    }
+  }
+
+  return {
+    created,
+    skipped,
+    periods: createdPeriods,
+    monthlyMinorUnits: monthly,
+    months: periods.length,
+  };
+}
+
 // ---- Expenses ----
 export const expensesCol = collection(db, 'expenses');
 
@@ -88,6 +354,20 @@ export async function createExpense({ vendor, category, amountShekels, kind }) {
     createdAt: serverTimestamp(),
   });
   return ref.id;
+}
+
+export async function updateExpense(id, { vendor, category, amountShekels, status, kind }) {
+  const patch = { updatedAt: serverTimestamp() };
+  if (vendor != null) patch.vendor = vendor;
+  if (category != null) patch.category = category;
+  if (kind != null) patch.kind = kind;
+  if (status != null) patch.status = status;
+  if (amountShekels != null) patch.amountMinorUnits = shekelsToMinorUnits(amountShekels);
+  await updateDoc(doc(db, 'expenses', id), patch);
+}
+
+export async function deleteExpense(id) {
+  await deleteDoc(doc(db, 'expenses', id));
 }
 
 /**

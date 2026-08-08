@@ -117,6 +117,8 @@ function ChildTeachersBlock({ childrenList, teachers, demo, onMessage }) {
     const names = new Set();
     [...(classes0 || []), ...(classes1 || []), ...(classes2 || [])].forEach((cl) => {
       if (cl.teacherId) ids.add(cl.teacherId);
+      (cl.teacherIds || []).forEach((tid) => ids.add(tid));
+      (cl.schedule || []).forEach((s) => { if (s.teacherId) ids.add(s.teacherId); });
       if (cl.teacher || cl.teacherName) names.add(cl.teacher || cl.teacherName);
     });
     let list = (teachers || []).filter((t) => ids.has(t.id) || names.has(t.name));
@@ -192,7 +194,11 @@ function ExcuseModal({ childrenList, demo, profile, onClose }) {
     setSubmitting(true);
     setError('');
     try {
-      const teacherIds = [...new Set((studentClasses || []).map((c) => c.teacherId).filter(Boolean))];
+      const teacherIds = [...new Set((studentClasses || []).flatMap((c) => [
+        c.teacherId,
+        ...(c.teacherIds || []),
+        ...(c.schedule || []).map((s) => s.teacherId),
+      ]).filter(Boolean))];
       await submitAbsenceExcuse({
         studentId,
         studentName: student?.name,

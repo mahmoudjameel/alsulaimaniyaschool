@@ -18,6 +18,9 @@ export default function ChargeInvoiceFilters({
   onSectionFilter,
   statusFilter,
   onStatusFilter,
+  periodFilter,
+  onPeriodFilter,
+  periodOptions = [],
   sortId,
   onSort,
   stageLabels = [],
@@ -57,6 +60,20 @@ export default function ChargeInvoiceFilters({
           <option key={s} value={s}>{s}</option>
         ))}
       </select>
+      {onPeriodFilter && (
+        <select
+          className="input"
+          style={{ width: 'auto', fontSize: 13 }}
+          value={periodFilter}
+          onChange={(e) => onPeriodFilter(e.target.value)}
+          aria-label="تصفية حسب الشهر"
+        >
+          <option value="الكل">الشهر: الكل</option>
+          {periodOptions.map((p) => (
+            <option key={p.value} value={p.value}>{p.label}</option>
+          ))}
+        </select>
+      )}
       {onStatusFilter && (
         <select
           className="input"

@@ -1,12 +1,15 @@
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import Logo from '../components/Logo';
+import { useAuth } from '../context/AuthContext';
 import {
   SCHOOL_LOCATION_AR,
   SCHOOL_NAME_AR,
   SCHOOL_TAGLINE_AR,
   SHOW_FAMILY_PORTALS,
 } from '../lib/constants';
+import { homePathForRole } from '../lib/loginMemory';
+import { ROLE_LABELS } from '../lib/permissions';
 import AcademicYearText from '../components/AcademicYearText';
 
 const STAFF_PORTALS = [
@@ -66,7 +69,10 @@ const FAMILY_PORTALS = [
 
 export default function Launcher() {
   const navigate = useNavigate();
+  const { firebaseUser, profile, role, loading, isFirebaseConfigured, signOut } = useAuth();
   const family = SHOW_FAMILY_PORTALS ? FAMILY_PORTALS : [];
+  const sessionReady = isFirebaseConfigured && !loading && firebaseUser && role;
+  const continueTo = sessionReady ? homePathForRole(role) : null;
 
   return (
     <div className="launch-shell" dir="rtl">
@@ -87,6 +93,26 @@ export default function Launcher() {
               ? 'دخول الموظفين وأولياء الأمور والطلاب إلى نظام المدرسة'
               : 'دخول الموظفين إلى نظام إدارة المدرسة'}
           </p>
+          {continueTo && (
+            <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ fontSize: 14 }}
+                onClick={() => navigate(continueTo)}
+              >
+                متابعة كـ{ROLE_LABELS[role] || profile?.name || 'مستخدم'} ←
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ fontSize: 13 }}
+                onClick={() => signOut()}
+              >
+                تسجيل الخروج
+              </button>
+            </div>
+          )}
         </section>
 
         <section className="launch-section" aria-labelledby="launch-staff">

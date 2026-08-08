@@ -40,14 +40,15 @@ function SlotCard({ row }) {
 }
 
 export default function TeacherSchedule() {
-  const { myClasses, error, demo } = useMyClasses();
+  const { myClasses, profile, error, demo } = useMyClasses();
   const [tab, setTab] = useState('today');
   const today = todaySchoolDay();
-  const todaySlots = useMemo(() => slotsForDay(myClasses, today), [myClasses, today]);
-  const week = useMemo(() => weekSlotsByDay(myClasses), [myClasses]);
+  const teacherOpts = useMemo(() => ({ teacherId: profile?.id }), [profile?.id]);
+  const todaySlots = useMemo(() => slotsForDay(myClasses, today, teacherOpts), [myClasses, today, teacherOpts]);
+  const week = useMemo(() => weekSlotsByDay(myClasses, teacherOpts), [myClasses, teacherOpts]);
   const hasAnySchedule = useMemo(
-    () => (myClasses || []).some((c) => Array.isArray(c.schedule) && c.schedule.length > 0),
-    [myClasses],
+    () => todaySlots.length > 0 || Object.values(week).some((rows) => rows.length > 0),
+    [todaySlots, week],
   );
 
   return (

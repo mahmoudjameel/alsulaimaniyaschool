@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { shekelsToMinorUnits } from '../lib/constants';
 import { logActivity } from './activity';
@@ -47,6 +47,20 @@ export async function createDisbursement({
   }).catch(() => {});
 
   return ref.id;
+}
+
+export async function updateDisbursement(id, patch = {}) {
+  const allowed = { updatedAt: serverTimestamp() };
+  if (patch.note !== undefined) allowed.note = (patch.note || '').trim() || null;
+  if (patch.vendor !== undefined) allowed.vendor = patch.vendor || null;
+  if (patch.staffName !== undefined) allowed.staffName = patch.staffName || null;
+  if (patch.amountShekels != null) allowed.amountMinorUnits = shekelsToMinorUnits(patch.amountShekels);
+  if (patch.status != null) allowed.status = patch.status;
+  await updateDoc(doc(db, 'disbursements', id), allowed);
+}
+
+export async function deleteDisbursement(id) {
+  await deleteDoc(doc(db, 'disbursements', id));
 }
 
 export async function markDisbursementPaid(id, actor) {

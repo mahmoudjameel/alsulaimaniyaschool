@@ -11,6 +11,7 @@ import { ageFromBirthDate, birthDateBounds, isPlausibleStudentBirthDate } from '
 import { useAcademicStages } from '../hooks/useAcademicStages';
 import { useAcademicYearLabel } from '../components/AcademicYearText';
 import { updateStudent } from '../services/students';
+import { syncStudentClassPlacement } from '../services/academics';
 import { logActivity } from '../services/activity';
 import { useAuth } from '../context/AuthContext';
 
@@ -85,6 +86,24 @@ export default function EditStudentModal({ student, onClose, demo }) {
     try {
       const gradeLabel = formatGradeLabel(stageLabel, classSection) || stageLabel;
       const ageYears = birthDate ? ageFromBirthDate(birthDate) : null;
+      const previous = {
+        id: student.id,
+        stageLabel: student.stageLabel,
+        classSection: student.classSection,
+        grade: student.grade,
+        shift: student.shift,
+        status: student.status,
+      };
+      const nextStudent = {
+        id: student.id,
+        name: fullName,
+        displayId: student.displayId,
+        stageLabel,
+        classSection: classSection || null,
+        grade: gradeLabel,
+        shift,
+        status,
+      };
       await updateStudent(student.id, {
         name: fullName,
         nameFirst: nameFirst.trim() || null,
@@ -113,12 +132,22 @@ export default function EditStudentModal({ student, onClose, demo }) {
         status,
         initial: fullName.charAt(0),
       });
+      const placementChanged = previous.stageLabel !== stageLabel
+        || previous.classSection !== classSection
+        || previous.shift !== shift;
+      let placementNote = '';
+      if (placementChanged && status === 'نشط') {
+        const placement = await syncStudentClassPlacement(nextStudent, previous);
+        placementNote = placement.enrolled || placement.removed
+          ? ` · إعادة توزيع: +${placement.enrolled} / −${placement.removed}`
+          : '';
+      }
       await logActivity({
         type: 'student_updated',
         actorUid: profile?.id,
         actorName: profile?.name,
         actorRole: profile?.role,
-        summary: `تعديل بيانات الطالب: ${fullName}`,
+        summary: `تعديل بيانات الطالب: ${fullName}${placementNote}`,
         targetType: 'student',
         targetId: student.id,
       });

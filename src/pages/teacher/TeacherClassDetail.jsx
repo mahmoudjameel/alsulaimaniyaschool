@@ -4,6 +4,7 @@ import { orderBy } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import SearchInput from '../../components/SearchInput';
 import TeacherStudentPeek from '../../components/TeacherStudentPeek';
+import ClassScheduleLines from '../../components/ClassScheduleLines';
 import { EmptyRow, ErrorBanner } from '../../components/ui';
 import { useMyClasses } from '../../hooks/useMyClasses';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
@@ -12,7 +13,7 @@ import { filterByStudentSearch } from '../../lib/studentSearch';
 
 export default function TeacherClassDetail() {
   const { id } = useParams();
-  const { myClasses, error, demo } = useMyClasses();
+  const { myClasses, profile, error, demo } = useMyClasses();
   const cls = myClasses.find((c) => c.id === id);
   const [search, setSearch] = useState('');
   const [peekId, setPeekId] = useState(null);
@@ -46,11 +47,17 @@ export default function TeacherClassDetail() {
         </Link>
         <h2 style={{ margin: 0, fontSize: 22 }}>{cls?.title || 'الصف'}</h2>
         <div style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>
-          {[cls?.subject, cls?.grade, cls?.shift].filter(Boolean).join(' · ')}
+          {[cls?.grade, cls?.shift].filter(Boolean).join(' · ')}
           {' · '}
           {enrolled.length} طالب
           {demo ? ' · عرض توضيحي' : ''}
         </div>
+        <ClassScheduleLines
+          cls={cls}
+          teacherId={profile?.id}
+          empty="لا حصص مسجّلة لك على هذا الصف"
+          style={{ marginTop: 4 }}
+        />
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
           <Link to={`/teacher/attendance?class=${id}`} className="btn btn-primary" style={{ fontSize: 13, textDecoration: 'none' }}>
             <Icon name="fact_check" size={15} /> حضور وغياب

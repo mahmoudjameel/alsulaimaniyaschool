@@ -27,6 +27,7 @@ export const ADMIN_NAV_GROUPS = [
     label: 'المالية',
     items: [
       { to: '/admin/billing', label: 'الفواتير والدفعات', icon: 'receipt_long', permission: 'billing.manage' },
+      { to: '/admin/seat-reservations', label: 'سجل حجز المقعد', icon: 'event', permission: 'billing.manage' },
       { to: '/admin/payments', label: 'وصول الدفع', icon: 'fact_check', permission: 'payments.manage' },
       { to: '/admin/fee-aid', label: 'خصم وإعفاء وتقسيط', icon: 'sell', permission: 'billing.manage' },
       { to: '/admin/finance-report', label: 'التقرير المالي', icon: 'analytics', permission: 'billing.manage' },
@@ -54,6 +55,7 @@ export const ADMIN_NAV_GROUPS = [
   {
     label: 'النظام',
     items: [
+      { to: '/admin/appearance', label: 'المظهر', icon: 'palette', permission: null },
       { to: '/admin/users', label: 'المستخدمون والصلاحيات', icon: 'admin_panel_settings', permission: 'users.manage' },
       { to: '/admin/backup', label: 'نسخ احتياطي ومسح', icon: 'settings_backup_restore', permission: 'system.backup' },
       { to: '/admin/activity', label: 'سجلّ الحركات', icon: 'history', permission: 'activity.view' },
@@ -67,6 +69,7 @@ const TITLES = {
   '/admin/students': 'الطلاب',
   '/admin/stages': 'المراحل الدراسية',
   '/admin/billing': 'الفواتير والدفعات',
+  '/admin/seat-reservations': 'سجل حجز المقعد',
   '/admin/payments': 'وصول الدفع',
   '/admin/fee-aid': 'خصم وإعفاء وتقسيط',
   '/admin/finance-report': 'التقرير المالي',
@@ -83,6 +86,7 @@ const TITLES = {
   '/admin/teachers': 'دليل المعلّمين',
   '/admin/grades': 'الدرجات',
   '/admin/academic-year': 'العام الدراسي والترحيل',
+  '/admin/appearance': 'المظهر',
   '/admin/cms': 'الموقع والمحتوى',
   '/admin/users': 'المستخدمون والصلاحيات',
   '/admin/backup': 'نسخ احتياطي ومسح',

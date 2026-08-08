@@ -4,6 +4,7 @@ import { orderBy } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import BackButton from '../../components/BackButton';
 import SearchInput from '../../components/SearchInput';
+import ClassScheduleLines from '../../components/ClassScheduleLines';
 import { ErrorBanner } from '../../components/ui';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { demoClasses, demoEnrollments, demoStudents } from '../../data/demo';
@@ -131,7 +132,7 @@ export default function Enrollment() {
       <header className="enroll-hero">
         <div>
           <h2 className="enroll-hero-title">تسجيل في الصفوف</h2>
-          <p className="enroll-hero-sub">اختر الصف، ابحث عن الطالب، ثم أضفه.</p>
+          <p className="enroll-hero-sub">اختر الصف، ابحث عن الطالب، ثم أضفه. الطلاب الجدد يُوزَّعون تلقائياً عند التسجيل حسب المرحلة والشعبة.</p>
         </div>
         {activeClass && (
           <div className="enroll-hero-stat">
@@ -147,7 +148,7 @@ export default function Enrollment() {
           <span className="enroll-step-num">1</span>
           <div>
             <div className="enroll-step-title">اختر الصف</div>
-            <div className="enroll-step-hint">المادة والمعلّم والفترة تظهر أسفل كل صف</div>
+            <div className="enroll-step-hint">المادة والمعلّم والأوقات تظهر أسفل كل صف</div>
           </div>
         </div>
         <div className="enroll-class-rail">
@@ -166,10 +167,13 @@ export default function Enrollment() {
               >
                 <span className="enroll-class-chip-title">{c.title}</span>
                 <span className="enroll-class-chip-meta">
-                  {c.subject}
-                  {c.teacher || c.teacherName ? ` · ${c.teacher || c.teacherName}` : ''}
-                  {c.shift ? ` · ${c.shift}` : ''}
+                  {[c.grade, c.classSection ? `شعبة ${c.classSection}` : null, c.shift].filter(Boolean).join(' · ') || '—'}
                 </span>
+                <ClassScheduleLines
+                  cls={c}
+                  empty="بدون جدول حصص"
+                  style={{ marginTop: 6, textAlign: 'right' }}
+                />
               </button>
             );
           })}

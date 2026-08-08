@@ -4,6 +4,7 @@ import StudentFeeAidPanel from '../../components/StudentFeeAidPanel';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
 import { useMyStudent } from '../../hooks/useMyStudent';
 import { formatILS } from '../../lib/constants';
+import { formatChargeTypeLabel, formatChargePeriodLabel } from '../../lib/chargeFilters';
 import { demoBilling, demoStudentDetail } from '../../data/demo';
 
 export default function StudentFees() {
@@ -17,9 +18,12 @@ export default function StudentFees() {
     studentId || '__none__',
   );
   const charges = [...(chargesRaw || [])].sort((a, b) => {
+    const pa = String(a.period || '');
+    const pb = String(b.period || '');
+    if (pa && pb && pa !== pb) return pa.localeCompare(pb);
     const ta = a.createdAt?.toMillis?.() || 0;
     const tb = b.createdAt?.toMillis?.() || 0;
-    return tb - ta;
+    return ta - tb;
   });
 
   const { data: ledger } = useLiveOrDemo(
@@ -46,7 +50,7 @@ export default function StudentFees() {
       </div>
 
       <section>
-        <h2 className="stu-section-title">الفواتير</h2>
+        <h2 className="stu-section-title">الفواتير حسب الشهر</h2>
         {charges.length === 0 ? (
           <p className="stu-empty">ما في فواتير.</p>
         ) : (
@@ -54,8 +58,10 @@ export default function StudentFees() {
             {charges.map((c, i) => (
               <div key={c.id || i} className="stu-list-row">
                 <div className="stu-list-main">
-                  <div className="stu-list-title">{c.type || 'فاتورة'}</div>
-                  <div className="stu-list-sub">{[c.status, c.method].filter(Boolean).join(' · ')}</div>
+                  <div className="stu-list-title">{formatChargeTypeLabel(c)}</div>
+                  <div className="stu-list-sub">
+                    {[formatChargePeriodLabel(c), c.status, c.method].filter(Boolean).join(' · ')}
+                  </div>
                 </div>
                 <span className="stu-list-side ah-tabnum">
                   {c.amount || formatILS(c.amountMinorUnits)}

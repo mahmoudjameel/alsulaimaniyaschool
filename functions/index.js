@@ -225,7 +225,8 @@ async function requirePermission(request, key) {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'يجب تسجيل الدخول.');
   const user = (await db.collection('users').doc(uid).get()).data();
-  if (!effectivePermission(user, key)) {
+  const keys = Array.isArray(key) ? key : [key];
+  if (!keys.some((k) => effectivePermission(user, k))) {
     throw new HttpsError('permission-denied', 'لا تملك صلاحية هذا الإجراء.');
   }
   return { uid, user };
@@ -239,6 +240,164 @@ async function logActivity({ type, actorUid, actorName, actorRole, summary, targ
     type, actorUid, actorName: actorName || '—', actorRole: actorRole || '—', summary,
     targetType: targetType || null, targetId: targetId || null, createdAt: FieldValue.serverTimestamp(),
   });
+}
+
+/** Place accepted/registered students into classrooms matching مرحلة + شعبة + دوام. */
+const SECTION_LETTERS = ['أ', 'ب', 'ج', 'د'];
+
+function parseStageAndSection(label) {
+  const raw = String(label || '').trim();
+  if (!raw) return { stage: '', section: null };
+  const m = raw.match(/^(.*?)\s*\/\s*([أبجد])\s*$/u);
+  if (m) return { stage: m[1].trim(), section: m[2] };
+  return { stage: raw, section: null };
+}
+
+function resolveClassSection(cls) {
+  if (cls?.classSection && SECTION_LETTERS.includes(cls.classSection)) return cls.classSection;
+  const fromGrade = parseStageAndSection(cls?.grade).section;
+  if (fromGrade) return fromGrade;
+  const title = String(cls?.title || '');
+  const m = title.match(/(?:^|[\s\/·\-])([أبجد])\s*$/u)
+    || title.match(/شعبة\s*([أبجد])/u);
+  return m && SECTION_LETTERS.includes(m[1]) ? m[1] : null;
+}
+
+function classMatchesStudent(cls, student) {
+  const studentStage = String(student.stageLabel || parseStageAndSection(student.grade).stage || '').trim();
+  const classStage = String(parseStageAndSection(cls.grade).stage || cls.grade || '').trim();
+  if (!studentStage || !classStage) return false;
+  if (classStage !== studentStage && String(cls.grade || '').trim() !== String(student.grade || '').trim()) {
+    return false;
+  }
+  if (student.shift && cls.shift && student.shift !== cls.shift) return false;
+  const studentSection = student.classSection || parseStageAndSection(student.grade).section;
+  const classSection = resolveClassSection(cls);
+  if (classSection && studentSection && classSection !== studentSection) return false;
+  if (classSection && !studentSection) return false;
+  return true;
+}
+
+async function enrollStudentAdmin(classId, classInfo, student) {
+  const enrollmentRef = db.collection('classes').doc(classId).collection('enrollments').doc(student.id);
+  const existing = await enrollmentRef.get();
+  if (existing.exists) return false;
+  await enrollmentRef.set({
+    studentId: student.id,
+    studentName: student.name,
+    displayId: student.displayId || null,
+    grade: student.grade || null,
+    enrolledAt: FieldValue.serverTimestamp(),
+  });
+  await db.collection('students').doc(student.id).collection('classes').doc(classId).set({
+    subject: classInfo.subject || '',
+    subjects: classInfo.subjects || null,
+    title: classInfo.title || '',
+    teacher: classInfo.teacher || '',
+    teacherId: classInfo.teacherId || null,
+    teacherIds: classInfo.teacherIds || (classInfo.teacherId ? [classInfo.teacherId] : []),
+    shift: classInfo.shift || null,
+    grade: classInfo.grade || student.grade || '—',
+    schedule: Array.isArray(classInfo.schedule) ? classInfo.schedule : [],
+    createdAt: FieldValue.serverTimestamp(),
+  });
+  await db.collection('classes').doc(classId).update({
+    studentsCount: FieldValue.increment(1),
+  });
+  return true;
+}
+
+async function enrollStudentInMatchingClassesAdmin(student) {
+  const snap = await db.collection('classes').get();
+  let enrolled = 0;
+  let matched = 0;
+  const classes = [];
+  for (const d of snap.docs) {
+    const cls = { id: d.id, ...d.data() };
+    if (!classMatchesStudent(cls, student)) continue;
+    matched += 1;
+    classes.push({ id: cls.id, title: cls.title, subject: cls.subject });
+    if (await enrollStudentAdmin(cls.id, cls, student)) enrolled += 1;
+  }
+  return { enrolled, matched, classes };
+}
+
+/** Academic year tuition: Sep→Jun (10 months). */
+const TUITION_MONTH_ORDER = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
+const MONTH_LABELS_AR = {
+  1: 'كانون الثاني', 2: 'شباط', 3: 'آذار', 4: 'نيسان', 5: 'أيار', 6: 'حزيران',
+  9: 'أيلول', 10: 'تشرين الأول', 11: 'تشرين الثاني', 12: 'كانون الأول',
+};
+
+function academicYearStartYear(academicYear) {
+  const m = String(academicYear || '').match(/(\d{4})/);
+  if (m) return Number(m[1]);
+  const now = new Date();
+  return now.getMonth() + 1 >= 9 ? now.getFullYear() : now.getFullYear() - 1;
+}
+
+function academicTuitionPeriods(academicYear) {
+  const startYear = academicYearStartYear(academicYear);
+  return TUITION_MONTH_ORDER.map((month) => {
+    const year = month >= 9 ? startYear : startYear + 1;
+    return {
+      period: `${year}-${String(month).padStart(2, '0')}`,
+      labelAr: `${MONTH_LABELS_AR[month] || month} ${year}`,
+    };
+  });
+}
+
+async function createAcademicYearTuitionPlanAdmin({
+  studentId, studentName, stageId, stageLabel, classSection, grade, academicYear, monthlyTuitionMinorUnits,
+}) {
+  const monthly = Number(monthlyTuitionMinorUnits) || 0;
+  if (!studentId || monthly <= 0) return { created: 0, monthly };
+  const periods = academicTuitionPeriods(academicYear);
+  const today = new Date().toISOString().slice(0, 10);
+  let created = 0;
+  for (const { period, labelAr } of periods) {
+    const chargeId = `${studentId}_${period}_tuition`;
+    const chargeRef = db.collection('charges').doc(chargeId);
+    // eslint-disable-next-line no-await-in-loop
+    const existing = await chargeRef.get();
+    if (existing.exists) continue;
+    // eslint-disable-next-line no-await-in-loop
+    await db.runTransaction(async (tx) => {
+      const again = await tx.get(chargeRef);
+      if (again.exists) return;
+      tx.set(chargeRef, {
+        studentId,
+        student: studentName || '—',
+        period,
+        periodLabel: labelAr,
+        type: 'رسوم دراسية شهرية',
+        amountMinorUnits: monthly,
+        discountMinorUnits: 0,
+        status: 'مسودّة',
+        method: '—',
+        stageId: stageId || null,
+        stageLabel: stageLabel || null,
+        classSection: classSection || null,
+        grade: grade || stageLabel || null,
+        academicYear: academicYear || null,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      tx.set(db.collection('students').doc(studentId).collection('ledger').doc(), {
+        date: today,
+        item: `رسوم دراسية — ${labelAr}`,
+        debitMinorUnits: monthly,
+        creditMinorUnits: 0,
+        chargeId,
+        period,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      tx.update(db.collection('students').doc(studentId), {
+        balanceMinorUnits: FieldValue.increment(monthly),
+      });
+    });
+    created += 1;
+  }
+  return { created, monthly, months: periods.length };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -282,6 +441,29 @@ export const acceptAdmission = onCall(async (request) => {
   }
 
   const studentRef = db.collection('students').doc();
+
+  // Resolve seat reservation + monthly tuition from the admission's academic stage.
+  let seatFee = 0;
+  let monthlyTuition = 0;
+  const stageId = admission.stageId || null;
+  const stageLabelForSeat = admission.stageLabel || admission.grade || null;
+  let stageData = null;
+  if (stageId) {
+    const stageSnap = await db.collection('academicStages').doc(stageId).get();
+    if (stageSnap.exists) {
+      stageData = stageSnap.data();
+      seatFee = Number(stageData?.seatReservationMinorUnits) || 0;
+      monthlyTuition = Number(stageData?.monthlyTuitionMinorUnits) || 0;
+    }
+  }
+  if (!monthlyTuition && stageLabelForSeat) {
+    const byLabel = await db.collection('academicStages').where('labelAr', '==', stageLabelForSeat).limit(1).get();
+    if (!byLabel.empty) {
+      monthlyTuition = Number(byLabel.docs[0].data()?.monthlyTuitionMinorUnits) || 0;
+      if (!seatFee) seatFee = Number(byLabel.docs[0].data()?.seatReservationMinorUnits) || 0;
+    }
+  }
+
   const batch = db.batch();
   batch.set(studentRef, {
     name: admission.name,
@@ -311,7 +493,7 @@ export const acceptAdmission = onCall(async (request) => {
     grade: admission.grade || admission.stageLabel || 'الأول الأساسي',
     shift: 'صباحي',
     status: 'نشط',
-    balanceMinorUnits: 0,
+    balanceMinorUnits: seatFee > 0 ? seatFee : 0,
     initial: (admission.name || 'ط').trim().charAt(0),
     studentUid: authUser.uid,
     createdAt: FieldValue.serverTimestamp(),
@@ -323,16 +505,91 @@ export const acceptAdmission = onCall(async (request) => {
   batch.update(admissionRef, {
     status: 'accepted', decidedAt: FieldValue.serverTimestamp(), linkedStudentId: studentRef.id,
   });
+
+  if (seatFee > 0) {
+    const chargeId = `${studentRef.id}_seat_reservation`;
+    batch.set(db.collection('charges').doc(chargeId), {
+      studentId: studentRef.id,
+      student: admission.name,
+      type: 'حجز مقعد',
+      amountMinorUnits: seatFee,
+      discountMinorUnits: 0,
+      status: 'مسودّة',
+      method: '—',
+      stageId,
+      stageLabel: stageLabelForSeat,
+      classSection: admission.classSection || null,
+      grade: admission.grade || stageLabelForSeat,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    batch.set(db.collection('students').doc(studentRef.id).collection('ledger').doc(), {
+      date: new Date().toISOString().slice(0, 10),
+      item: `حجز مقعد${stageLabelForSeat ? ` — ${stageLabelForSeat}` : ''}`,
+      debitMinorUnits: seatFee,
+      creditMinorUnits: 0,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  }
+
   await batch.commit();
+
+  const studentForPlacement = {
+    id: studentRef.id,
+    name: admission.name,
+    displayId,
+    grade: admission.grade || admission.stageLabel || 'الأول الأساسي',
+    stageLabel: admission.stageLabel || admission.grade || 'الأول الأساسي',
+    classSection: admission.classSection || null,
+    shift: 'صباحي',
+    status: 'نشط',
+  };
+  let placement = { enrolled: 0, matched: 0 };
+  let tuitionPlan = { created: 0, monthly: monthlyTuition };
+  try {
+    placement = await enrollStudentInMatchingClassesAdmin(studentForPlacement);
+  } catch (err) {
+    console.error('auto-enroll on acceptAdmission failed', err);
+  }
+  try {
+    if (monthlyTuition > 0) {
+      tuitionPlan = await createAcademicYearTuitionPlanAdmin({
+        studentId: studentRef.id,
+        studentName: admission.name,
+        stageId,
+        stageLabel: stageLabelForSeat,
+        classSection: admission.classSection || null,
+        grade: admission.grade || stageLabelForSeat,
+        academicYear: admission.academicYear || null,
+        monthlyTuitionMinorUnits: monthlyTuition,
+      });
+    }
+  } catch (err) {
+    console.error('tuition plan on acceptAdmission failed', err);
+  }
+
   await logActivity({
     type: 'admission_accepted', actorUid, actorName: actor?.name, actorRole: actor?.role,
-    summary: `قبول تسجيل: ${admission.name} — أُنشئ برقم ${displayId}`,
+    summary: [
+      `قبول تسجيل: ${admission.name} — أُنشئ برقم ${displayId}`,
+      placement.enrolled > 0 ? `· توزيع على ${placement.enrolled} صف` : '',
+      seatFee > 0 ? '· حجز مقعد' : '',
+      tuitionPlan.created > 0 ? `· ${tuitionPlan.created} قسطاً شهرياً` : '',
+    ].filter(Boolean).join(' '),
     targetType: 'student', targetId: studentRef.id,
   });
 
   // Student portal no longer needs the temp password; keep returning it for
   // backwards compatibility with any admin UI that still displays it.
-  return { studentId: studentRef.id, displayId, tempPassword, guardianUid };
+  return {
+    studentId: studentRef.id,
+    displayId,
+    tempPassword,
+    guardianUid,
+    seatFeeMinorUnits: seatFee,
+    monthlyTuitionMinorUnits: monthlyTuition,
+    classesEnrolled: placement.enrolled,
+    tuitionMonthsCreated: tuitionPlan.created || 0,
+  };
 });
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -433,11 +690,22 @@ async function issuePortalTokenHandler(request) {
 // ─────────────────────────────────────────────────────────────────────────
 
 export const createStaffAccount = onCall(async (request) => {
-  const { uid: actorUid, user: actor } = await requirePermission(request, 'users.manage');
-  const { email, name, role, title, childStudentIds, password } = request.data || {};
+  const { uid: actorUid, user: actor } = await requirePermission(request, ['users.manage', 'staff.manage']);
+  const {
+    email, name, role, title, childStudentIds, password,
+    // Optional payroll fields (from الموظفون والأجور)
+    salaryType, monthlySalaryMinorUnits, hourlyRateMinorUnits, dailyRateMinorUnits,
+    hoursPerMonth, phone, notes,
+  } = request.data || {};
   if (!email || !name || !role) throw new HttpsError('invalid-argument', 'الاسم والبريد والدور مطلوبة.');
   if (!['admin', 'director', 'teacher', 'accountant', 'parent', 'reception'].includes(role)) {
     throw new HttpsError('invalid-argument', 'دور غير معروف.');
+  }
+
+  // staff.manage alone may only provision portal workers (not admin/parent).
+  const canManageUsers = effectivePermission(actor, 'users.manage');
+  if (!canManageUsers && !['teacher', 'accountant', 'reception', 'director'].includes(role)) {
+    throw new HttpsError('permission-denied', 'صلاحية الموظفين تسمح بإنشاء معلّم أو محاسب أو استقبال أو مديرة فقط.');
   }
 
   const chosen = typeof password === 'string' ? password.trim() : '';
@@ -445,7 +713,15 @@ export const createStaffAccount = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'كلمة المرور يجب أن تكون 6 أحرف على الأقل.');
   }
   const tempPassword = chosen || randomTempPassword();
-  const authUser = await auth.createUser({ email, password: tempPassword, displayName: name });
+  let authUser;
+  try {
+    authUser = await auth.createUser({ email, password: tempPassword, displayName: name });
+  } catch (err) {
+    if (err?.code === 'auth/email-already-exists') {
+      throw new HttpsError('already-exists', 'هذا البريد مستخدم مسبقاً.');
+    }
+    throw err;
+  }
 
   const defaultTitle = role === 'director' ? 'مديرة'
     : role === 'teacher' ? 'معلّم'
@@ -453,35 +729,52 @@ export const createStaffAccount = onCall(async (request) => {
         : role === 'reception' ? 'استقبال'
           : '';
 
+  const staffTitle = (title || defaultTitle || 'موظف').trim();
+  const resolvedSalaryType = ['monthly', 'hourly', 'daily'].includes(salaryType) ? salaryType : 'monthly';
+  const monthly = resolvedSalaryType === 'monthly'
+    ? (Number(monthlySalaryMinorUnits) || (role === 'teacher' ? 50000 : 45000))
+    : null;
+  const hourly = resolvedSalaryType === 'hourly' ? (Number(hourlyRateMinorUnits) || 0) : null;
+  const daily = resolvedSalaryType === 'daily' ? (Number(dailyRateMinorUnits) || 0) : null;
+  const base = monthly || hourly || daily || 0;
+  const legacyType = resolvedSalaryType === 'hourly' ? 'أجر ساعة'
+    : resolvedSalaryType === 'daily' ? 'راتب يومي' : 'راتب شهري';
+
   const batch = db.batch();
   batch.set(db.collection('users').doc(authUser.uid), {
     role,
     name,
-    title: title || defaultTitle,
+    title: staffTitle,
     email,
     permissions: ROLE_DEFAULT_PERMISSIONS[role] || {},
     createdAt: FieldValue.serverTimestamp(),
   });
-  if (role === 'teacher' || role === 'accountant' || role === 'reception') {
-    const roleType = role === 'teacher' ? 'teacher' : role === 'accountant' ? 'accountant' : 'reception';
-    const staffTitle = title || defaultTitle;
+  if (role === 'teacher' || role === 'accountant' || role === 'reception' || role === 'director') {
+    const roleType = role;
     batch.set(db.collection('staff').doc(authUser.uid), {
       name,
       role: staffTitle,
       jobTitleAr: staffTitle,
       roleType,
-      salaryType: 'monthly',
-      type: 'راتب شهري',
-      monthlySalaryMinorUnits: role === 'teacher' ? 50000 : 45000,
-      baseMinorUnits: role === 'teacher' ? 50000 : 45000,
+      salaryType: resolvedSalaryType,
+      type: legacyType,
+      monthlySalaryMinorUnits: monthly,
+      hourlyRateMinorUnits: hourly,
+      dailyRateMinorUnits: daily,
+      hoursPerMonth: resolvedSalaryType === 'hourly' ? (Number(hoursPerMonth) || 160) : null,
+      baseMinorUnits: base,
+      phone: (phone || '').trim() || null,
+      notes: (notes || '').trim() || null,
       authUid: authUser.uid,
       active: true,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
   }
   if (role === 'teacher') {
     batch.set(db.collection('teacherProfiles').doc(authUser.uid), {
-      name, subject: title || '—', bio: '', email, phone: '', initial: (name || 'م').trim().charAt(0),
-    });
+      name, subject: title || '—', bio: '', email, phone: (phone || '').trim() || '', initial: (name || 'م').trim().charAt(0),
+    }, { merge: true });
   }
   if (role === 'parent' && Array.isArray(childStudentIds)) {
     for (const studentId of childStudentIds) {
@@ -495,7 +788,175 @@ export const createStaffAccount = onCall(async (request) => {
     targetType: 'user', targetId: authUser.uid,
   });
 
-  return { uid: authUser.uid, tempPassword };
+  return { uid: authUser.uid, tempPassword, email, role };
+});
+
+export const updateStaffAccount = onCall(async (request) => {
+  const { uid: actorUid, user: actor } = await requirePermission(request, 'users.manage');
+  const { uid, name, title, email, password, role, permissions } = request.data || {};
+  if (!uid) throw new HttpsError('invalid-argument', 'معرّف المستخدم مطلوب.');
+  if (uid === actorUid && role && role !== actor.role && actor.role === 'admin') {
+    // Allow admin to change own title/name/email/password, but not drop admin role accidentally via empty checks below
+  }
+
+  const userRef = db.collection('users').doc(uid);
+  const snap = await userRef.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'المستخدم غير موجود.');
+  const existing = snap.data() || {};
+
+  if (existing.role === 'admin' && actor.role !== 'admin') {
+    throw new HttpsError('permission-denied', 'لا يمكن تعديل حساب الإدارة إلا من حساب إدارة.');
+  }
+
+  const nextRole = role || existing.role;
+  if (!['admin', 'director', 'teacher', 'accountant', 'reception'].includes(nextRole)) {
+    throw new HttpsError('invalid-argument', 'دور غير معروف.');
+  }
+
+  // Prevent stripping the last admin
+  if (existing.role === 'admin' && nextRole !== 'admin') {
+    const admins = await db.collection('users').where('role', '==', 'admin').limit(2).get();
+    if (admins.size <= 1) {
+      throw new HttpsError('failed-precondition', 'لا يمكن تغيير دور آخر حساب إدارة في النظام.');
+    }
+  }
+  if (uid === actorUid && nextRole !== 'admin' && actor.role === 'admin') {
+    const admins = await db.collection('users').where('role', '==', 'admin').limit(2).get();
+    if (admins.size <= 1) {
+      throw new HttpsError('failed-precondition', 'لا يمكن إزالة صلاحية الإدارة عن حسابك وهو الحساب الوحيد.');
+    }
+  }
+
+  const nextName = (name != null ? String(name) : existing.name || '').trim();
+  const nextTitle = (title != null ? String(title) : existing.title || '').trim();
+  const nextEmail = (email != null ? String(email).trim().toLowerCase() : (existing.email || '')).trim();
+  if (!nextName) throw new HttpsError('invalid-argument', 'الاسم مطلوب.');
+  if (!nextEmail) throw new HttpsError('invalid-argument', 'البريد مطلوب.');
+
+  const chosen = typeof password === 'string' ? password.trim() : '';
+  if (chosen && chosen.length < 6) {
+    throw new HttpsError('invalid-argument', 'كلمة المرور يجب أن تكون 6 أحرف على الأقل.');
+  }
+
+  const authPatch = { displayName: nextName, email: nextEmail };
+  if (chosen) authPatch.password = chosen;
+  try {
+    await auth.updateUser(uid, authPatch);
+  } catch (err) {
+    if (err?.code === 'auth/email-already-exists') {
+      throw new HttpsError('already-exists', 'هذا البريد مستخدم مسبقاً.');
+    }
+    if (err?.code === 'auth/invalid-email') {
+      throw new HttpsError('invalid-argument', 'البريد الإلكتروني غير صالح.');
+    }
+    throw err;
+  }
+
+  const userPatch = {
+    name: nextName,
+    title: nextTitle,
+    email: nextEmail,
+    role: nextRole,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  if (nextRole === 'admin') {
+    userPatch.permissions = {};
+  } else if (permissions && typeof permissions === 'object') {
+    userPatch.permissions = permissions;
+  } else if (role && role !== existing.role) {
+    userPatch.permissions = ROLE_DEFAULT_PERMISSIONS[nextRole] || {};
+  }
+
+  const batch = db.batch();
+  batch.set(userRef, userPatch, { merge: true });
+
+  const staffRef = db.collection('staff').doc(uid);
+  const staffSnap = await staffRef.get();
+  if (staffSnap.exists) {
+    batch.set(staffRef, {
+      name: nextName,
+      role: nextTitle || nextName,
+      jobTitleAr: nextTitle || staffSnap.data()?.jobTitleAr || nextName,
+      roleType: ['teacher', 'accountant', 'reception', 'director'].includes(nextRole) ? nextRole : (staffSnap.data()?.roleType || 'other'),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+  }
+
+  if (nextRole === 'teacher') {
+    batch.set(db.collection('teacherProfiles').doc(uid), {
+      name: nextName,
+      email: nextEmail,
+      subject: nextTitle || '—',
+      initial: nextName.charAt(0) || 'م',
+    }, { merge: true });
+  }
+
+  await batch.commit();
+  await logActivity({
+    type: 'staff_updated', actorUid, actorName: actor?.name, actorRole: actor?.role,
+    summary: `تعديل مستخدم: ${nextName} (${nextRole})`,
+    targetType: 'user', targetId: uid,
+  });
+
+  return { uid, email: nextEmail, role: nextRole, passwordChanged: !!chosen };
+});
+
+export const deleteStaffAccount = onCall(async (request) => {
+  const { uid: actorUid, user: actor } = await requirePermission(request, 'users.manage');
+  const { uid } = request.data || {};
+  if (!uid) throw new HttpsError('invalid-argument', 'معرّف المستخدم مطلوب.');
+  if (uid === actorUid) {
+    throw new HttpsError('failed-precondition', 'لا يمكنك حذف حسابك الحالي.');
+  }
+
+  const userRef = db.collection('users').doc(uid);
+  const snap = await userRef.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'المستخدم غير موجود.');
+  const existing = snap.data() || {};
+
+  if (existing.role === 'admin' && actor.role !== 'admin') {
+    throw new HttpsError('permission-denied', 'لا يمكن حذف حساب الإدارة إلا من حساب إدارة.');
+  }
+  if (existing.role === 'admin') {
+    const admins = await db.collection('users').where('role', '==', 'admin').limit(2).get();
+    if (admins.size <= 1) {
+      throw new HttpsError('failed-precondition', 'لا يمكن حذف آخر حساب إدارة في النظام.');
+    }
+  }
+
+  const batch = db.batch();
+  batch.delete(userRef);
+
+  const staffRef = db.collection('staff').doc(uid);
+  const staffSnap = await staffRef.get();
+  if (staffSnap.exists) {
+    batch.set(staffRef, {
+      active: false,
+      authUid: null,
+      notes: [staffSnap.data()?.notes, 'حساب الدخول حُذف'].filter(Boolean).join(' · '),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+  }
+
+  const teacherRef = db.collection('teacherProfiles').doc(uid);
+  const teacherSnap = await teacherRef.get();
+  if (teacherSnap.exists) batch.delete(teacherRef);
+
+  await batch.commit();
+
+  try {
+    await auth.deleteUser(uid);
+  } catch (err) {
+    if (err?.code !== 'auth/user-not-found') throw err;
+  }
+
+  await logActivity({
+    type: 'staff_deleted', actorUid, actorName: actor?.name, actorRole: actor?.role,
+    summary: `حذف مستخدم: ${existing.name || uid} (${existing.role || '—'})`,
+    targetType: 'user', targetId: uid,
+  });
+
+  return { uid, deleted: true };
 });
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -569,15 +1030,23 @@ export const generateInvoices = onCall(async (request) => {
 
     // eslint-disable-next-line no-await-in-loop
     await db.runTransaction(async (tx) => {
+      const [y, m] = String(period).split('-').map(Number);
+      const MONTH_AR = {
+        1: 'كانون الثاني', 2: 'شباط', 3: 'آذار', 4: 'نيسان', 5: 'أيار', 6: 'حزيران',
+        9: 'أيلول', 10: 'تشرين الأول', 11: 'تشرين الثاني', 12: 'كانون الأول',
+      };
+      const periodLabelAr = `${MONTH_AR[m] || m} ${y}`;
       tx.set(chargeRef, {
-        studentId: studentDoc.id, student: student.name, period, type: 'رسوم دراسية شهرية',
+        studentId: studentDoc.id, student: student.name, period,
+        periodLabel: periodLabelAr,
+        type: 'رسوم دراسية شهرية',
         stageId: student.stageId || null, stageLabel: student.stageLabel || null,
         classSection: student.classSection || null, grade: student.grade || null,
         amountMinorUnits: fee, discountMinorUnits: 0, status: 'مسودّة', method: '—',
         createdAt: FieldValue.serverTimestamp(),
       });
       tx.set(db.collection('students').doc(studentDoc.id).collection('ledger').doc(), {
-        date: period, item: `رسوم دراسية شهرية — ${period}`, debitMinorUnits: fee, creditMinorUnits: 0,
+        date: period, item: `رسوم شهر ${periodLabelAr}`, debitMinorUnits: fee, creditMinorUnits: 0,
         createdAt: FieldValue.serverTimestamp(),
       });
       tx.update(db.collection('students').doc(studentDoc.id), {

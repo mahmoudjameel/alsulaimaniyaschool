@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { orderBy, where } from 'firebase/firestore';
 import Icon from '../../components/Icon';
 import TeacherPunchCard from '../../components/TeacherPunchCard';
+import ClassScheduleLines from '../../components/ClassScheduleLines';
 import { ErrorBanner } from '../../components/ui';
 import { useMyClasses } from '../../hooks/useMyClasses';
 import { useLiveOrDemo } from '../../hooks/useFirestore';
@@ -126,8 +127,14 @@ export default function TeacherDashboard() {
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 16 }}>{c.title}</div>
                   <div style={{ fontSize: 12, color: 'var(--color-neutral-600)', marginTop: 4 }}>
-                    {[c.subject, c.grade, c.shift].filter(Boolean).join(' · ')}
+                    {[c.grade, c.shift].filter(Boolean).join(' · ')}
                   </div>
+                  <ClassScheduleLines
+                    cls={c}
+                    teacherId={profile?.id}
+                    empty="لا حصص مسجّلة لك بعد"
+                    style={{ marginTop: 8 }}
+                  />
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--color-neutral-600)', textAlign: 'left' }}>
                   {n == null ? '…' : `${n} طالب`}

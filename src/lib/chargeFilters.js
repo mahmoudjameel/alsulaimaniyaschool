@@ -1,7 +1,11 @@
 import { SECTION_OPTIONS } from './constants';
 import { matchesStudentSearch } from './studentSearch';
+import { periodToLabelAr } from './billingPeriods';
+import { isMonthlyTuitionType, isSeatReservationType } from './feeTypes';
 
 export const CHARGE_SORT_OPTIONS = [
+  { id: 'period_asc', label: 'الشهر (أيلول → حزيران)' },
+  { id: 'period_desc', label: 'الشهر (الأحدث)' },
   { id: 'newest', label: 'الأحدث أولاً' },
   { id: 'oldest', label: 'الأقدم أولاً' },
   { id: 'student', label: 'اسم الطالب' },
@@ -9,6 +13,30 @@ export const CHARGE_SORT_OPTIONS = [
   { id: 'amount_desc', label: 'المبلغ (الأعلى)' },
   { id: 'amount_asc', label: 'المبلغ (الأدنى)' },
 ];
+
+/** Display month for a charge: periodLabel or derived from period. */
+export function formatChargePeriodLabel(charge) {
+  if (!charge) return '';
+  if (charge.periodLabel) return String(charge.periodLabel);
+  if (charge.period) return periodToLabelAr(charge.period);
+  return '';
+}
+
+/**
+ * Human label for invoice tables:
+ * monthly → «رسوم شهر أيلول 2026», seat → type, else type.
+ */
+export function formatChargeTypeLabel(charge) {
+  if (!charge) return '—';
+  const period = formatChargePeriodLabel(charge);
+  const type = String(charge.type || '').trim();
+  if (period && (isMonthlyTuitionType(type) || /رسوم/.test(type))) {
+    return `رسوم شهر ${period}`;
+  }
+  if (isSeatReservationType(type)) return type || 'حجز مقعد';
+  if (period && type) return `${type} · ${period}`;
+  return type || period || '—';
+}
 
 export { SECTION_OPTIONS as CHARGE_SECTION_OPTIONS };
 
@@ -79,6 +107,21 @@ function amountOf(c) {
   return Math.round(Number(raw || 0) * 100);
 }
 
+function periodKey(c) {
+  return String(c?.period || '') || '9999-99';
+}
+
+/** Academic-year order: Sep→Jun then by student name. */
+function compareAcademicPeriod(a, b) {
+  const pa = periodKey(a);
+  const pb = periodKey(b);
+  if (pa === pb) return 0;
+  const [ya, ma] = pa.split('-').map(Number);
+  const [yb, mb] = pb.split('-').map(Number);
+  const rank = (y, m) => (m >= 9 ? y * 100 + m : (y - 1) * 100 + (m + 12));
+  return rank(ya || 0, ma || 0) - rank(yb || 0, mb || 0);
+}
+
 function sortCharges(list, sortId, studentMap) {
   const rows = [...list];
   const stageKey = (c) => {
@@ -88,6 +131,16 @@ function sortCharges(list, sortId, studentMap) {
   const nameKey = (c) => String(c.student || c.studentName || '');
 
   switch (sortId) {
+    case 'period_asc':
+      return rows.sort((a, b) => {
+        const p = compareAcademicPeriod(a, b);
+        return p !== 0 ? p : nameKey(a).localeCompare(nameKey(b), 'ar');
+      });
+    case 'period_desc':
+      return rows.sort((a, b) => {
+        const p = compareAcademicPeriod(b, a);
+        return p !== 0 ? p : nameKey(a).localeCompare(nameKey(b), 'ar');
+      });
     case 'oldest':
       return rows.sort((a, b) => createdAtMs(a) - createdAtMs(b));
     case 'student':
@@ -115,7 +168,8 @@ export function filterAndSortCharges(charges, {
   stageFilter = 'الكل',
   sectionFilter = 'الكل',
   statusFilter = 'الكل',
-  sortId = 'newest',
+  periodFilter = 'الكل',
+  sortId = 'period_asc',
   students = [],
 } = {}) {
   const studentMap = studentsByIdMap(students);
@@ -128,16 +182,35 @@ export function filterAndSortCharges(charges, {
         studentName: c.student || c.studentName,
         grade: resolved.grade,
         stageLabel: resolved.stageLabel,
+        periodLabel: formatChargePeriodLabel(c),
       },
       search,
-      ['type', 'method', 'status', 'period'],
+      ['type', 'method', 'status', 'period', 'periodLabel'],
     )) return false;
     if (!chargeMatchesStage(c, stageFilter, studentMap)) return false;
     if (!chargeMatchesSection(c, sectionFilter, studentMap)) return false;
     if (statusFilter !== 'الكل' && c.status !== statusFilter) return false;
+    if (periodFilter && periodFilter !== 'الكل') {
+      const p = c.period || '';
+      const label = formatChargePeriodLabel(c);
+      if (p !== periodFilter && label !== periodFilter) return false;
+    }
     return true;
   });
   return sortCharges(filtered, sortId, studentMap);
+}
+
+/** Unique periods present in charges, academic order. */
+export function uniqueChargePeriods(charges = []) {
+  const map = new Map();
+  for (const c of charges) {
+    const key = c.period || formatChargePeriodLabel(c);
+    if (!key) continue;
+    if (!map.has(key)) map.set(key, formatChargePeriodLabel(c) || key);
+  }
+  return [...map.entries()]
+    .sort((a, b) => compareAcademicPeriod({ period: a[0] }, { period: b[0] }))
+    .map(([value, label]) => ({ value, label }));
 }
 
 /** Short Arabic label for table cell. */

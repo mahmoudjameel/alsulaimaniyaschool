@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import PhoneWhatsAppField from '../../components/PhoneWhatsAppField';
 import {
-  GUARDIAN_WORK_STATUS_OPTIONS, HOUSING_TYPE_OPTIONS, SCHOOL_LOCATION_AR, SCHOOL_NAME_AR,
+  formatILS, GUARDIAN_WORK_STATUS_OPTIONS, HOUSING_TYPE_OPTIONS, SCHOOL_LOCATION_AR, SCHOOL_NAME_AR,
   SECTION_OPTIONS,
 } from '../../lib/constants';
 import {
@@ -243,9 +243,21 @@ export default function Register() {
                     {stages.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.labelAr}{s.ageRange ? ` — ${s.ageRange}` : ''}
+                        {Number(s.seatReservationMinorUnits) > 0 ? ` · حجز مقعد ${formatILS(s.seatReservationMinorUnits)}` : ''}
                       </option>
                     ))}
                   </select>
+                  {(() => {
+                    const selected = stages.find((s) => s.id === form.stageId);
+                    const fee = Number(selected?.seatReservationMinorUnits) || 0;
+                    if (fee <= 0) return null;
+                    return (
+                      <p className="reg-field-hint" style={{ marginTop: 8 }}>
+                        حجز مقعد لهذه المرحلة: <strong className="ah-tabnum">{formatILS(fee)}</strong>
+                        {' '}— يُطلب عند قبول التسجيل (ليس دفعاً عبر الموقع).
+                      </p>
+                    );
+                  })()}
                 </div>
                 <div className="field reg-span-2">
                   <span className="reg-label">طريقة التواصل المفضّلة</span>

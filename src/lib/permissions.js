@@ -17,7 +17,7 @@ export const PERMISSIONS = [
   { key: 'teachers.manage', label: 'دليل المعلّمين', group: 'الأكاديمي', description: 'ملفات المعلّمين الظاهرة للموقع' },
   { key: 'grades.approve', label: 'اعتماد الدرجات', group: 'الأكاديمي', description: 'مراجعة واعتماد درجات الطلاب' },
   { key: 'cms.manage', label: 'الموقع والمحتوى', group: 'الأكاديمي', description: 'المقالات والمحتوى العام للموقع' },
-  { key: 'users.manage', label: 'المستخدمون والصلاحيات', group: 'النظام', description: 'دعوة المستخدمين ومنح الصلاحيات' },
+  { key: 'users.manage', label: 'المستخدمون والصلاحيات', group: 'النظام', description: 'دعوة المستخدمين وتعديلهم وحذفهم ومنح الصلاحيات' },
   { key: 'system.backup', label: 'نسخ احتياطي ومسح', group: 'النظام', description: 'تنزيل النسخ الاحتياطية ومسح البيانات' },
   { key: 'activity.view', label: 'سجلّ الحركات', group: 'النظام', description: 'عرض سجل العمليات في النظام' },
 ];

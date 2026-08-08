@@ -16,9 +16,18 @@ export const DEFAULT_ACADEMIC_STAGES = GRADE_OPTIONS.map((labelAr, order) => ({
   category: order <= 1 ? 'preschool' : 'primary',
   ageRange: order === 0 ? '3–4 سنوات' : order === 1 ? '4–5 سنوات' : `${5 + order}–${6 + order} سنوات`,
   monthlyTuitionMinorUnits: [25000, 28000, 35000, 35000, 38000, 40000, 40000, 42000][order] ?? 40000,
+  seatReservationMinorUnits: 5000, // ₪50 default seat hold
 }));
 
-export async function createStage({ labelAr, category, ageRange, order, monthlyTuitionShekels }) {
+function toMinorOrNull(shekels) {
+  if (shekels == null || shekels === '') return null;
+  const n = shekelsToMinorUnits(shekels);
+  return n > 0 ? n : 0;
+}
+
+export async function createStage({
+  labelAr, category, ageRange, order, monthlyTuitionShekels, seatReservationShekels,
+}) {
   const ref = await addDoc(stagesCol, {
     labelAr: (labelAr || '').trim(),
     category: category || 'primary',
@@ -27,6 +36,7 @@ export async function createStage({ labelAr, category, ageRange, order, monthlyT
     monthlyTuitionMinorUnits: monthlyTuitionShekels != null && monthlyTuitionShekels !== ''
       ? shekelsToMinorUnits(monthlyTuitionShekels)
       : null,
+    seatReservationMinorUnits: toMinorOrNull(seatReservationShekels),
     active: true,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -56,6 +66,7 @@ export async function seedDefaultStages() {
       ageRange: s.ageRange,
       order: i,
       monthlyTuitionMinorUnits: shekelsToMinorUnits(defaultFees[i] ?? 400),
+      seatReservationMinorUnits: 5000,
       active: true,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -69,5 +80,11 @@ export async function setStageMonthlyFee(stageId, monthlyTuitionShekels) {
     monthlyTuitionMinorUnits: monthlyTuitionShekels != null && monthlyTuitionShekels !== ''
       ? shekelsToMinorUnits(monthlyTuitionShekels)
       : null,
+  });
+}
+
+export async function setStageSeatFee(stageId, seatReservationShekels) {
+  await updateStage(stageId, {
+    seatReservationMinorUnits: toMinorOrNull(seatReservationShekels),
   });
 }

@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { demoArticles, demoAnnouncements, demoComments } from '../../data/demo';
 import {
   createArticle, createAnnouncement, moderateComment, publishArticle, publishAnnouncement,
+  updateArticle, deleteArticle, updateAnnouncement, deleteAnnouncement,
 } from '../../services/content';
 
 const TABS = [
@@ -25,6 +26,8 @@ export default function Cms() {
   const [busyId, setBusyId] = useState(null);
   const [localComments, setLocalComments] = useState({});
   const [showNew, setShowNew] = useState(false);
+  const [editingArticle, setEditingArticle] = useState(null);
+  const [editingAnn, setEditingAnn] = useState(null);
 
   const active = { articles, ann: announcements, comments }[tab];
   const current = TABS.find((t) => t.id === tab);
@@ -54,6 +57,32 @@ export default function Cms() {
     }
   };
 
+  const onDeleteArticle = async (row) => {
+    if (demo || !row?.id) return;
+    if (!window.confirm(`حذف المقال «${row.title}»؟`)) return;
+    setBusyId(row.id);
+    try {
+      await deleteArticle(row.id);
+    } catch {
+      window.alert('تعذّر الحذف.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const onDeleteAnn = async (row) => {
+    if (demo || !row?.id) return;
+    if (!window.confirm(`حذف الإعلان «${row.title}»؟`)) return;
+    setBusyId(row.id);
+    try {
+      await deleteAnnouncement(row.id);
+    } catch {
+      window.alert('تعذّر الحذف.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <ErrorBanner>{active.error && 'تعذّر تحميل المحتوى.'}</ErrorBanner>
@@ -78,10 +107,12 @@ export default function Cms() {
                   <td><span className="tag tag-neutral">{a.category}</span></td>
                   <td><span className={`tag tag-${a.tone || 'neutral'}`}>{a.status}</span></td>
                   <td className="ah-tabnum" style={{ color: 'var(--color-neutral-500)' }}>{a.date}</td>
-                  <td style={{ textAlign: 'left' }}>
+                  <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>
+                    <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} disabled={demo || !a.id} onClick={() => setEditingArticle(a)}>تعديل</button>
                     {a.status !== 'منشور' && a.id && (
                       <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} disabled={busyId === a.id} onClick={() => onPublish(a, 'article')}>نشر</button>
                     )}
+                    <button type="button" className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--color-accent-2-700)' }} disabled={demo || busyId === a.id} onClick={() => onDeleteArticle(a)}>حذف</button>
                   </td>
                 </tr>
               ))}
@@ -102,10 +133,12 @@ export default function Cms() {
                   <td><span className="tag tag-outline">{a.audience}</span></td>
                   <td><span className={`tag tag-${a.tone || 'neutral'}`}>{a.status}</span></td>
                   <td className="ah-tabnum" style={{ color: 'var(--color-neutral-500)' }}>{a.date}</td>
-                  <td style={{ textAlign: 'left' }}>
+                  <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>
+                    <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} disabled={demo || !a.id} onClick={() => setEditingAnn(a)}>تعديل</button>
                     {a.status !== 'منشور' && a.id && (
                       <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} disabled={busyId === a.id} onClick={() => onPublish(a, 'ann')}>نشر</button>
                     )}
+                    <button type="button" className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--color-accent-2-700)' }} disabled={demo || busyId === a.id} onClick={() => onDeleteAnn(a)}>حذف</button>
                   </td>
                 </tr>
               ))}
@@ -149,6 +182,20 @@ export default function Cms() {
       )}
       {showNew && tab === 'ann' && (
         <NewAnnouncementModal demo={demo} onClose={() => setShowNew(false)} />
+      )}
+      {editingArticle && (
+        <EditArticleModal
+          article={editingArticle}
+          demo={demo}
+          onClose={() => setEditingArticle(null)}
+        />
+      )}
+      {editingAnn && (
+        <EditAnnouncementModal
+          ann={editingAnn}
+          demo={demo}
+          onClose={() => setEditingAnn(null)}
+        />
       )}
     </div>
   );
@@ -230,6 +277,88 @@ function NewAnnouncementModal({ demo, onClose }) {
       </Field>
       <Field label="النص"><textarea className="input" rows={4} value={body} onChange={(e) => setBody(e.target.value)} /></Field>
       <label className="radio"><input type="checkbox" checked={publishNow} onChange={(e) => setPublishNow(e.target.checked)} /><span className="dot" /> نشر فوراً</label>
+    </Modal>
+  );
+}
+
+function EditArticleModal({ article, demo, onClose }) {
+  const [title, setTitle] = useState(article?.title || '');
+  const [category, setCategory] = useState(article?.category || 'أخبار');
+  const [excerpt, setExcerpt] = useState(article?.excerpt || '');
+  const [status, setStatus] = useState(article?.status || 'مسودّة');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    if (demo) { setError('صِل Firebase للحفظ.'); return; }
+    setSubmitting(true);
+    setError('');
+    try {
+      await updateArticle(article.id, { title, category, excerpt, status });
+      onClose();
+    } catch {
+      setError('تعذّر حفظ التعديل.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal title="تعديل المقال" onClose={onClose} onSubmit={onSubmit} submitLabel="حفظ" submitting={submitting} error={error} width={520}>
+      <Field label="العنوان"><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required /></Field>
+      <Field label="الفئة">
+        <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
+          <option>أخبار</option><option>أنشطة</option><option>إرشادات</option><option>مناسبات</option>
+        </select>
+      </Field>
+      <Field label="مقتطف"><textarea className="input" rows={4} value={excerpt} onChange={(e) => setExcerpt(e.target.value)} /></Field>
+      <Field label="الحالة">
+        <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option>مسودّة</option><option>منشور</option>
+        </select>
+      </Field>
+    </Modal>
+  );
+}
+
+function EditAnnouncementModal({ ann, demo, onClose }) {
+  const [title, setTitle] = useState(ann?.title || '');
+  const [audience, setAudience] = useState(ann?.audience || 'الجميع');
+  const [body, setBody] = useState(ann?.body || '');
+  const [status, setStatus] = useState(ann?.status || 'مسودّة');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    if (demo) { setError('صِل Firebase للحفظ.'); return; }
+    setSubmitting(true);
+    setError('');
+    try {
+      await updateAnnouncement(ann.id, { title, audience, body, status });
+      onClose();
+    } catch {
+      setError('تعذّر حفظ التعديل.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal title="تعديل الإعلان" onClose={onClose} onSubmit={onSubmit} submitLabel="حفظ" submitting={submitting} error={error}>
+      <Field label="العنوان"><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required /></Field>
+      <Field label="الجمهور">
+        <select className="input" value={audience} onChange={(e) => setAudience(e.target.value)}>
+          <option>الجميع</option><option>أولياء الأمور</option><option>المعلّمون</option><option>الطلاب</option>
+        </select>
+      </Field>
+      <Field label="النص"><textarea className="input" rows={4} value={body} onChange={(e) => setBody(e.target.value)} /></Field>
+      <Field label="الحالة">
+        <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option>مسودّة</option><option>منشور</option>
+        </select>
+      </Field>
     </Modal>
   );
 }

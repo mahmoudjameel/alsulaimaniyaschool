@@ -38,7 +38,12 @@ export default function StudentClasses() {
         teacher: e.teacher || e.teacherName || full?.teacher || full?.teacherName || '',
         progress: e.progress,
         scheduleLabel: schedule.length
-          ? schedule.map((s) => `${s.day} ${s.start || ''}`).join(' · ')
+          ? schedule.map((s) => [
+            s.day,
+            s.start && s.end ? `${s.start}–${s.end}` : (s.start || ''),
+            s.subject || '',
+            s.teacherName || '',
+          ].filter(Boolean).join(' ')).join(' · ')
           : '',
       };
     });
