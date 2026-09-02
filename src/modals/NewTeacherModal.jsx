@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
 import Modal from '../components/Modal';
 import { Field } from '../components/ui';
+import SubjectIdsPicker from '../components/SubjectIdsPicker';
 import { createStaffAccount } from '../services/users';
 import { updateTeacherProfile } from '../services/teachers';
 import { SCHOOL_EMAIL_DOMAIN } from '../lib/constants';
 
 import { useTeachingSubjects } from '../hooks/useTeachingSubjects';
-import { assignTeacherSubject } from '../services/teachingSubjects';
+import { setTeacherSubjects } from '../services/teachingSubjects';
 
 export default function NewTeacherModal({ onClose, demo }) {
   const { subjects, labels, byId, demo: subjectsDemo } = useTeachingSubjects();
   const [name, setName] = useState('');
-  const [subjectId, setSubjectId] = useState(() => subjects[0]?.id || '');
+  const [subjectIds, setSubjectIds] = useState(() => (subjects[0]?.id ? [subjects[0].id] : []));
   const [bio, setBio] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,8 +22,9 @@ export default function NewTeacherModal({ onClose, demo }) {
   const [created, setCreated] = useState(null);
 
   useEffect(() => {
-    if (!subjectId && subjects[0]?.id) setSubjectId(subjects[0].id);
-  }, [subjects, subjectId]);
+    if (subjectIds.length || !subjects[0]?.id) return;
+    setSubjectIds([subjects[0].id]);
+  }, [subjects, subjectIds.length]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -40,16 +42,20 @@ export default function NewTeacherModal({ onClose, demo }) {
       setError('كلمة المرور يجب أن تكون 6 أحرف على الأقل.');
       return;
     }
+    if (!subjectIds.length) {
+      setError('اختر مادة واحدة على الأقل.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
-      const picked = byId.get(subjectId);
-      const subjectLabel = picked?.labelAr || labels[0] || 'معلّم';
+      const subjectLabels = subjectIds.map((id) => byId.get(id)?.labelAr).filter(Boolean);
+      const subjectLabel = subjectLabels.join(' · ') || labels[0] || 'معلّم';
       const res = await createStaffAccount({
         name: name.trim(),
         email: trimmedEmail,
         role: 'teacher',
-        title: subjectLabel,
+        title: subjectLabels[0] || subjectLabel,
         password: trimmedPass,
         phone: phone.trim() || undefined,
       });
@@ -57,13 +63,14 @@ export default function NewTeacherModal({ onClose, demo }) {
       if (uid) {
         try {
           await updateTeacherProfile(uid, {
-            subjectId: subjectId || null,
+            subjectIds,
+            subjectId: subjectIds[0] || null,
             subject: subjectLabel,
             bio: bio.trim(),
             phone: phone.trim() || '',
           });
-          if (subjectId && !subjectsDemo && !demo) {
-            await assignTeacherSubject(uid, subjectId);
+          if (!subjectsDemo && !demo) {
+            await setTeacherSubjects(uid, subjectIds);
           }
         } catch {
           /* profile already created by CF; bio is optional */
@@ -136,13 +143,8 @@ export default function NewTeacherModal({ onClose, demo }) {
           required
         />
       </Field>
-      <Field label="التخصّص (من مواد التدريس)">
-        <select className="input" value={subjectId} onChange={(e) => setSubjectId(e.target.value)} required>
-          {subjects.length === 0 && <option value="">— أضف مواد من «مواد التدريس» —</option>}
-          {subjects.map((s) => (
-            <option key={s.id} value={s.id}>{s.labelAr}</option>
-          ))}
-        </select>
+      <Field label="المواد التي يدرّسها (اختر واحدة أو أكثر)">
+        <SubjectIdsPicker subjects={subjects} selectedIds={subjectIds} onChange={setSubjectIds} />
       </Field>
       <Field label="البريد الإلكتروني (للدخول)">
         <input

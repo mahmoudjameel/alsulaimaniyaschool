@@ -31,13 +31,36 @@ export function findSubjectByLabel(subjects, label) {
   ) || null;
 }
 
-/** Teachers linked to this subject label; falls back to full list if none linked. */
+/** Normalize teacher profile → subject id list (supports legacy single subjectId). */
+export function teacherSubjectIds(teacher) {
+  if (!teacher) return [];
+  if (Array.isArray(teacher.subjectIds) && teacher.subjectIds.length) {
+    return [...new Set(teacher.subjectIds.filter(Boolean))];
+  }
+  if (teacher.subjectId) return [teacher.subjectId];
+  return [];
+}
+
+export function teacherSubjectLabels(teacher, subjectsById) {
+  const ids = teacherSubjectIds(teacher);
+  if (ids.length && subjectsById) {
+    const labels = ids.map((id) => subjectsById.get(id)?.labelAr).filter(Boolean);
+    if (labels.length) return labels.join(' · ');
+  }
+  return teacher?.subject || '—';
+}
+
+/** Teachers linked to this subject; falls back to full list if none linked. */
 export function teachersForSubjectLabel(allTeachers, subjects, subjectLabel) {
   const sub = findSubjectByLabel(subjects, subjectLabel);
-  const ids = sub?.teacherIds || [];
-  if (!ids.length) return allTeachers || [];
-  const set = new Set(ids);
-  const filtered = (allTeachers || []).filter((t) => set.has(t.id));
+  if (!sub) return allTeachers || [];
+  const ids = new Set(sub.teacherIds || []);
+  // Also include teachers who list this subject on their profile (multi-subject).
+  for (const t of allTeachers || []) {
+    if (teacherSubjectIds(t).includes(sub.id)) ids.add(t.id);
+  }
+  if (!ids.size) return allTeachers || [];
+  const filtered = (allTeachers || []).filter((t) => ids.has(t.id));
   return filtered.length ? filtered : (allTeachers || []);
 }
 
@@ -47,6 +70,19 @@ function normalizeSubjectKey(s) {
     .replace(/\s+/g, '')
     .trim()
     .toLowerCase();
+}
+
+async function subjectLabelMap() {
+  const snap = await getDocs(subjectsQuery());
+  return new Map(snap.docs.map((d) => [d.id, d.data().labelAr || '—']));
+}
+
+function profileSubjectIds(data = {}) {
+  if (Array.isArray(data.subjectIds) && data.subjectIds.length) {
+    return [...new Set(data.subjectIds.filter(Boolean))];
+  }
+  if (data.subjectId) return [data.subjectId];
+  return [];
 }
 
 export async function createTeachingSubject({ labelAr, shortLabel, order }) {
@@ -73,64 +109,94 @@ export async function deleteTeachingSubject(id) {
   await deleteDoc(doc(db, 'teachingSubjects', id));
 }
 
-/** Link one teacher as primary subject; updates subject.teacherIds + teacher profile. */
-export async function assignTeacherSubject(teacherId, subjectId, { previousSubjectId } = {}) {
+/** Add teacher to one subject without removing other subjects they teach. */
+export async function linkTeacherToSubject(teacherId, subjectId) {
   if (!teacherId || !subjectId) return;
-  const subjectSnap = await getDoc(doc(db, 'teachingSubjects', subjectId));
-  if (!subjectSnap.exists()) return;
-  const label = subjectSnap.data().labelAr || '—';
+  const labelById = await subjectLabelMap();
+  const tSnap = await getDoc(doc(db, 'teacherProfiles', teacherId));
+  const ids = profileSubjectIds(tSnap.data());
+  if (!ids.includes(subjectId)) ids.push(subjectId);
 
   const batch = writeBatch(db);
-  if (previousSubjectId && previousSubjectId !== subjectId) {
-    batch.update(doc(db, 'teachingSubjects', previousSubjectId), {
-      teacherIds: arrayRemove(teacherId),
-      updatedAt: serverTimestamp(),
-    });
-  }
   batch.update(doc(db, 'teachingSubjects', subjectId), {
     teacherIds: arrayUnion(teacherId),
     updatedAt: serverTimestamp(),
   });
+  const labels = ids.map((id) => labelById.get(id)).filter(Boolean);
   batch.update(doc(db, 'teacherProfiles', teacherId), {
-    subjectId,
-    subject: label,
+    subjectIds: ids,
+    subjectId: ids[0] || null,
+    subject: labels.join(' · ') || '—',
     updatedAt: serverTimestamp(),
-  }, { merge: true });
+  });
   await batch.commit();
 }
 
-/** Replace full teacher list on a subject and sync teacher profiles. */
+/** Link many subjects to one teacher (replaces teacher's subject list). */
+export async function setTeacherSubjects(teacherId, subjectIds) {
+  if (!teacherId) return;
+  const nextIds = [...new Set((subjectIds || []).filter(Boolean))];
+  const labelById = await subjectLabelMap();
+  const labels = nextIds.map((id) => labelById.get(id)).filter(Boolean);
+
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'teacherProfiles', teacherId), {
+    subjectIds: nextIds,
+    subjectId: nextIds[0] || null,
+    subject: labels.length ? labels.join(' · ') : '—',
+    updatedAt: serverTimestamp(),
+  });
+
+  const allSubjects = await getDocs(subjectsQuery());
+  for (const sDoc of allSubjects.docs) {
+    const sid = sDoc.id;
+    const current = sDoc.data().teacherIds || [];
+    const should = nextIds.includes(sid);
+    const has = current.includes(teacherId);
+    if (should && !has) {
+      batch.update(sDoc.ref, { teacherIds: arrayUnion(teacherId), updatedAt: serverTimestamp() });
+    } else if (!should && has) {
+      batch.update(sDoc.ref, { teacherIds: arrayRemove(teacherId), updatedAt: serverTimestamp() });
+    }
+  }
+  await batch.commit();
+}
+
+/** Replace teachers on one subject; each teacher keeps other subjects they teach. */
 export async function setSubjectTeachers(subjectId, teacherIds) {
   const subjectRef = doc(db, 'teachingSubjects', subjectId);
   const subjectSnap = await getDoc(subjectRef);
   if (!subjectSnap.exists()) throw new Error('subject not found');
-  const label = subjectSnap.data().labelAr || '—';
+
   const prevIds = subjectSnap.data().teacherIds || [];
   const nextIds = [...new Set((teacherIds || []).filter(Boolean))];
+  const removed = prevIds.filter((id) => !nextIds.includes(id));
+  const added = nextIds.filter((id) => !prevIds.includes(id));
+  const affected = [...new Set([...removed, ...added])];
+  const labelById = await subjectLabelMap();
 
   const batch = writeBatch(db);
   batch.update(subjectRef, { teacherIds: nextIds, updatedAt: serverTimestamp() });
 
-  for (const tid of prevIds) {
-    if (!nextIds.includes(tid)) {
-      const tSnap = await getDoc(doc(db, 'teacherProfiles', tid));
-      if (tSnap.exists() && tSnap.data().subjectId === subjectId) {
-        batch.update(doc(db, 'teacherProfiles', tid), {
-          subjectId: null,
-          subject: '—',
-          updatedAt: serverTimestamp(),
-        });
-      }
-    }
-  }
-  for (const tid of nextIds) {
+  for (const tid of affected) {
+    const tSnap = await getDoc(doc(db, 'teacherProfiles', tid));
+    let ids = profileSubjectIds(tSnap.data());
+    if (added.includes(tid) && !ids.includes(subjectId)) ids.push(subjectId);
+    if (removed.includes(tid)) ids = ids.filter((id) => id !== subjectId);
+    const labels = ids.map((id) => labelById.get(id)).filter(Boolean);
     batch.update(doc(db, 'teacherProfiles', tid), {
-      subjectId,
-      subject: label,
+      subjectIds: ids,
+      subjectId: ids[0] || null,
+      subject: labels.length ? labels.join(' · ') : '—',
       updatedAt: serverTimestamp(),
-    }, { merge: true });
+    });
   }
   await batch.commit();
+}
+
+/** @deprecated use linkTeacherToSubject — kept for imports */
+export async function assignTeacherSubject(teacherId, subjectId) {
+  return linkTeacherToSubject(teacherId, subjectId);
 }
 
 export async function seedDefaultTeachingSubjects() {
@@ -165,7 +231,7 @@ export async function seedDefaultTeachingSubjects() {
       return tKey === a || tKey === b || tKey.includes(a) || a.includes(tKey);
     });
     if (match) {
-      await assignTeacherSubject(tDoc.id, match.ref.id);
+      await linkTeacherToSubject(tDoc.id, match.ref.id);
       linked += 1;
     }
   }

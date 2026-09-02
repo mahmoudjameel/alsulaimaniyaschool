@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import Modal from '../../components/Modal';
 import { EmptyRow, ErrorBanner, Field } from '../../components/ui';
+import SubjectTeacherPicker from '../../components/SubjectTeacherPicker';
 import { useTeachingSubjects } from '../../hooks/useTeachingSubjects';
 import { useAssignableTeachers } from '../../hooks/useAssignableTeachers';
 import {
@@ -20,10 +21,6 @@ function LinkTeachersModal({ subject, teachers, demo, onClose }) {
   const [selected, setSelected] = useState(() => [...(subject?.teacherIds || [])]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-
-  const toggle = (id) => {
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  };
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -59,33 +56,14 @@ function LinkTeachersModal({ subject, teachers, demo, onClose }) {
       error={error}
       width={480}
     >
-      <div className="dialog-body">اختر المعلّمين الذين يدرّسون هذه المادة. يظهرون عند إضافة معلّم أو توزيع حصص الصفوف.</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflow: 'auto' }}>
-        {teachers.length === 0 && (
-          <div style={{ fontSize: 13, color: 'var(--color-neutral-500)' }}>
-            لا معلّمين بعد —{' '}
-            <Link to="/admin/teachers" style={{ color: 'var(--gold)' }}>أضف من دليل المعلّمين</Link>.
-          </div>
-        )}
-        {teachers.map((t) => (
-          <label
-            key={t.id}
-            className="radio"
-            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 8 }}
-          >
-            <input type="checkbox" checked={selected.includes(t.id)} onChange={() => toggle(t.id)} />
-            <span>
-              <strong>{t.name}</strong>
-              {t.subject && t.subject !== '—' ? (
-                <span style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}> · {t.subject}</span>
-              ) : null}
-              {!t.login && (
-                <span style={{ fontSize: 11, color: 'var(--color-accent-2-700)' }}> (بدون حساب)</span>
-              )}
-            </span>
-          </label>
-        ))}
+      <div className="dialog-body">
+        اضغط على اسم المعلّم لتحديده أو إلغاء تحديده. يمكن للمعلّم تدريس أكثر من مادة.
       </div>
+      <SubjectTeacherPicker
+        teachers={teachers}
+        selectedIds={selected}
+        onChange={setSelected}
+      />
     </Modal>
   );
 }
@@ -185,8 +163,7 @@ export default function TeachingSubjects() {
 
       <div className="card" style={{ borderColor: 'var(--color-accent-300)', background: 'var(--color-accent-100)', padding: '14px 16px' }}>
         <div style={{ fontSize: 13, color: 'var(--color-accent-900)', lineHeight: 1.7 }}>
-          أضِف <strong>مواد التدريس</strong> واربطها بالمعلّمين هنا قبل توزيع الحصص على الصفوف.
-          عند إضافة معلّم جديد تختار مادته من هذه القائمة، وتظهر المواد في جدول الصفوف.
+          أضِف <strong>مواد التدريس</strong> واربطها بالمعلّمين. المعلّم الواحد يمكن أن يدرّس <strong>أكثر من مادة</strong>.
         </div>
       </div>
 
