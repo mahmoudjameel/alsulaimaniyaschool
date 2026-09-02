@@ -53,6 +53,7 @@ export default function Classes() {
       <ErrorBanner>{error && 'تعذّر تحميل الصفوف.'}</ErrorBanner>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <h4 style={{ margin: 0 }}>الصفوف والمناهج</h4>
+        <Link to="/admin/subjects" className="ah-tablink" style={{ color: 'var(--gold)', fontSize: 13 }}>مواد التدريس ←</Link>
         <Link to="/admin/teachers" className="ah-tablink" style={{ color: 'var(--gold)', fontSize: 13 }}>دليل المعلّمين ←</Link>
         <select className="input" style={{ width: 'auto', fontSize: 13, marginInlineStart: 'auto' }} value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)}>
           <option value="الكل">الدوام: الكل</option>

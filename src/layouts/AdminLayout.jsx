@@ -45,6 +45,7 @@ export const ADMIN_NAV_GROUPS = [
     items: [
       { to: '/admin/classes', label: 'الصفوف والدروس', icon: 'menu_book', permission: 'classes.manage' },
       { to: '/admin/enrollment', label: 'تسجيل الطلاب في الصفوف', icon: 'person_add', permission: 'enrollment.manage' },
+      { to: '/admin/subjects', label: 'مواد التدريس', icon: 'library_books', permission: 'teachers.manage' },
       { to: '/admin/teachers', label: 'دليل المعلّمين', icon: 'co_present', permission: 'teachers.manage' },
       { to: '/admin/grades', label: 'الدرجات', icon: 'grade', permission: 'grades.approve' },
       { to: '/admin/academic-year', label: 'العام الدراسي والترحيل', icon: 'event', permission: 'students.manage' },
@@ -83,6 +84,7 @@ const TITLES = {
   '/admin/expenses': 'المصاريف',
   '/admin/classes': 'الصفوف والدروس',
   '/admin/enrollment': 'تسجيل الطلاب في الصفوف',
+  '/admin/subjects': 'مواد التدريس',
   '/admin/teachers': 'دليل المعلّمين',
   '/admin/grades': 'الدرجات',
   '/admin/academic-year': 'العام الدراسي والترحيل',

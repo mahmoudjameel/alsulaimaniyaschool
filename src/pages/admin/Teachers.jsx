@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { orderBy } from 'firebase/firestore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import SearchInput from '../../components/SearchInput';
 import { ErrorBanner } from '../../components/ui';
@@ -76,6 +76,7 @@ export default function Teachers() {
       <ErrorBanner>{error && 'تعذّر تحميل دليل المعلّمين.'}</ErrorBanner>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <h4 style={{ margin: 0 }}>دليل المعلّمين</h4>
+        <Link to="/admin/subjects" className="ah-tablink" style={{ fontSize: 13, color: 'var(--gold)' }}>مواد التدريس ←</Link>
         <SearchInput
           value={search}
           onChange={setSearch}

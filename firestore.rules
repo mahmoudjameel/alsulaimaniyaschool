@@ -407,6 +407,11 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin() || hasPerm('stages.manage');
     }
 
+    match /teachingSubjects/{id} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin() || hasPerm('teachers.manage') || hasPerm('classes.manage');
+    }
+
     // ---- Teacher observations (cross-student feed for the teacher portal) ----
     match /observations/{id} {
       allow create: if isTeacher()

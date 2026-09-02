@@ -7,6 +7,8 @@ import { logActivity } from '../services/activity';
 import { useAuth } from '../context/AuthContext';
 import { useAssignableTeachers } from '../hooks/useAssignableTeachers';
 import { useAcademicStages } from '../hooks/useAcademicStages';
+import { useTeachingSubjects } from '../hooks/useTeachingSubjects';
+import { teachersForSubjectLabel } from '../services/teachingSubjects';
 import {
   CLASS_DAYS, CLASS_SUBJECTS, deriveClassMetaFromSchedule,
   emptyScheduleRow, expandScheduleSlots, groupScheduleSlots, subjectsLabel, toggleInList,
@@ -21,6 +23,8 @@ export default function EditClassModal({ cls, onClose, demo }) {
   const { profile } = useAuth();
   const { teachers } = useAssignableTeachers();
   const { stages, labels } = useAcademicStages();
+  const { subjects, labels: subjectLabels } = useTeachingSubjects();
+  const scheduleSubjects = subjectLabels.length ? subjectLabels : CLASS_SUBJECTS;
   const [title, setTitle] = useState(cls?.title || '');
   const [grade, setGrade] = useState(cls?.grade || '');
   const [classSection, setClassSection] = useState(() => resolveClassSection(cls) || SECTION_OPTIONS[0]);
@@ -50,7 +54,7 @@ export default function EditClassModal({ cls, onClose, demo }) {
   const addSlot = () => {
     const last = schedule[schedule.length - 1];
     setSchedule((s) => [...s, emptyScheduleRow({
-      subject: last?.subject || CLASS_SUBJECTS[0],
+      subject: last?.subject || scheduleSubjects[0],
       teacherId: last?.teacherId || cls?.teacherId || '',
       start: last?.start || '08:00',
       end: last?.end || '08:45',
@@ -197,9 +201,9 @@ export default function EditClassModal({ cls, onClose, demo }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <Field label="المادة">
-                  <select className="input" value={row.subject} onChange={(e) => updateSlot(i, { subject: e.target.value })}>
-                    {CLASS_SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
-                    {row.subject && !CLASS_SUBJECTS.includes(row.subject) && (
+                  <select className="input" value={row.subject} onChange={(e) => updateSlot(i, { subject: e.target.value, teacherId: '' })}>
+                    {scheduleSubjects.map((s) => <option key={s} value={s}>{s}</option>)}
+                    {row.subject && !scheduleSubjects.includes(row.subject) && (
                       <option value={row.subject}>{row.subject}</option>
                     )}
                   </select>
@@ -212,7 +216,7 @@ export default function EditClassModal({ cls, onClose, demo }) {
                     required
                   >
                     <option value="" disabled>اختر معلّماً…</option>
-                    {teachers.map((t) => (
+                    {teachersForSubjectLabel(teachers, subjects, row.subject).map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.name}{t.subject ? ` — ${t.subject}` : ''}{t.login ? '' : ' (دليل فقط)'}
                       </option>

@@ -1,24 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Modal from '../components/Modal';
 import { Field } from '../components/ui';
 import { createStaffAccount } from '../services/users';
 import { updateTeacherProfile } from '../services/teachers';
 import { SCHOOL_EMAIL_DOMAIN } from '../lib/constants';
 
-const SUBJECTS = [
-  'اللغة العربية',
-  'الرياضيات',
-  'العلوم',
-  'اللغة الإنجليزية',
-  'التربية الإسلامية',
-  'الفنون',
-  'الحاسوب والتقنية',
-  'التربية الرياضية',
-];
+import { useTeachingSubjects } from '../hooks/useTeachingSubjects';
+import { assignTeacherSubject } from '../services/teachingSubjects';
 
 export default function NewTeacherModal({ onClose, demo }) {
+  const { subjects, labels, byId, demo: subjectsDemo } = useTeachingSubjects();
   const [name, setName] = useState('');
-  const [subject, setSubject] = useState(SUBJECTS[0]);
+  const [subjectId, setSubjectId] = useState(() => subjects[0]?.id || '');
   const [bio, setBio] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,6 +19,10 @@ export default function NewTeacherModal({ onClose, demo }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [created, setCreated] = useState(null);
+
+  useEffect(() => {
+    if (!subjectId && subjects[0]?.id) setSubjectId(subjects[0].id);
+  }, [subjects, subjectId]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -46,22 +43,28 @@ export default function NewTeacherModal({ onClose, demo }) {
     setSubmitting(true);
     setError('');
     try {
+      const picked = byId.get(subjectId);
+      const subjectLabel = picked?.labelAr || labels[0] || 'معلّم';
       const res = await createStaffAccount({
         name: name.trim(),
         email: trimmedEmail,
         role: 'teacher',
-        title: subject,
+        title: subjectLabel,
         password: trimmedPass,
         phone: phone.trim() || undefined,
       });
       const uid = res.data?.uid;
-      if (uid && (bio.trim() || subject)) {
+      if (uid) {
         try {
           await updateTeacherProfile(uid, {
-            subject: subject || '—',
+            subjectId: subjectId || null,
+            subject: subjectLabel,
             bio: bio.trim(),
             phone: phone.trim() || '',
           });
+          if (subjectId && !subjectsDemo && !demo) {
+            await assignTeacherSubject(uid, subjectId);
+          }
         } catch {
           /* profile already created by CF; bio is optional */
         }
@@ -133,9 +136,12 @@ export default function NewTeacherModal({ onClose, demo }) {
           required
         />
       </Field>
-      <Field label="التخصّص">
-        <select className="input" value={subject} onChange={(e) => setSubject(e.target.value)}>
-          {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
+      <Field label="التخصّص (من مواد التدريس)">
+        <select className="input" value={subjectId} onChange={(e) => setSubjectId(e.target.value)} required>
+          {subjects.length === 0 && <option value="">— أضف مواد من «مواد التدريس» —</option>}
+          {subjects.map((s) => (
+            <option key={s.id} value={s.id}>{s.labelAr}</option>
+          ))}
         </select>
       </Field>
       <Field label="البريد الإلكتروني (للدخول)">

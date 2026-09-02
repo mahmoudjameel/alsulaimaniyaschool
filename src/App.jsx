@@ -11,6 +11,7 @@ import AdminLayout from './layouts/AdminLayout';
 import Dashboard from './pages/admin/Dashboard';
 import Admissions from './pages/admin/Admissions';
 import Students from './pages/admin/Students';
+import TeachingSubjects from './pages/admin/TeachingSubjects';
 import AcademicStages from './pages/admin/AcademicStages';
 import StudentProfile from './pages/admin/StudentProfile';
 import SeatReservations from './pages/SeatReservations';
@@ -125,6 +126,7 @@ export default function App() {
             <Route index element={<Dashboard />} />
             <Route path="admissions" element={<Admissions />} />
             <Route path="students" element={<Students />} />
+            <Route path="subjects" element={<TeachingSubjects />} />
             <Route path="stages" element={<AcademicStages />} />
             <Route path="students/:id" element={<StudentProfile />} />
             <Route path="billing" element={<Billing />} />
