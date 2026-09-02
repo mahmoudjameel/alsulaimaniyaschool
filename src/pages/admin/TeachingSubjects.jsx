@@ -115,9 +115,11 @@ export default function TeachingSubjects() {
     try {
       const res = await seedDefaultTeachingSubjects();
       if (res.created === 0) {
-        setMessage('المواد موجودة مسبقاً.');
-      } else {
+        setMessage('كل المواد الافتراضية موجودة مسبقاً.');
+      } else if (res.linked != null) {
         setMessage(`زُرعت ${res.created} مواد افتراضية${res.linked ? ` وربط ${res.linked} معلّم` : ''}.`);
+      } else {
+        setMessage(`أُضيفت ${res.created} مواد ناقصة من القائمة الافتراضية.`);
       }
     } catch {
       setMessage('تعذّر زرع المواد.');

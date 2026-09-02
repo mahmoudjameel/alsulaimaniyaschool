@@ -13,10 +13,12 @@ export const DEFAULT_TEACHING_SUBJECTS = [
   { id: 'ts-math', labelAr: 'الرياضيات', shortLabel: 'رياضيات', teacherIds: [], order: 1, active: true },
   { id: 'ts-sci', labelAr: 'العلوم', shortLabel: 'علوم', teacherIds: [], order: 2, active: true },
   { id: 'ts-en', labelAr: 'اللغة الإنجليزية', shortLabel: 'إنجليزي', teacherIds: [], order: 3, active: true },
-  { id: 'ts-islam', labelAr: 'التربية الإسلامية', shortLabel: 'تربية إسلامية', teacherIds: [], order: 4, active: true },
-  { id: 'ts-art', labelAr: 'الفنون', shortLabel: 'فنون', teacherIds: [], order: 5, active: true },
-  { id: 'ts-it', labelAr: 'الحاسوب والتقنية', shortLabel: 'حاسوب', teacherIds: [], order: 6, active: true },
-  { id: 'ts-pe', labelAr: 'التربية الرياضية', shortLabel: 'تربية رياضية', teacherIds: [], order: 7, active: true },
+  { id: 'ts-islam', labelAr: 'التربية الدينية', shortLabel: 'تربية دينية', teacherIds: [], order: 4, active: true },
+  { id: 'ts-hist', labelAr: 'تاريخ وجغرافيا', shortLabel: 'تاريخ وجغرافيا', teacherIds: [], order: 5, active: true },
+  { id: 'ts-culture', labelAr: 'ثقافة', shortLabel: 'ثقافة', teacherIds: [], order: 6, active: true },
+  { id: 'ts-it', labelAr: 'تكنولوجيا', shortLabel: 'تكنولوجيا', teacherIds: [], order: 7, active: true },
+  { id: 'ts-pe', labelAr: 'رياضة', shortLabel: 'رياضة', teacherIds: [], order: 8, active: true },
+  { id: 'ts-art', labelAr: 'فنون وحرف', shortLabel: 'فنون وحرف', teacherIds: [], order: 9, active: true },
 ];
 
 export function subjectScheduleLabel(subject) {
@@ -199,9 +201,60 @@ export async function assignTeacherSubject(teacherId, subjectId) {
   return linkTeacherToSubject(teacherId, subjectId);
 }
 
+/** Labels treated as the same subject when adding missing defaults. */
+const SUBJECT_LABEL_ALIASES = {
+  'التربية الدينية': ['التربية الإسلامية', 'تربية إسلامية'],
+  'تكنولوجيا': ['الحاسوب والتقنية', 'حاسوب'],
+  'رياضة': ['التربية الرياضية', 'تربية رياضية'],
+  'فنون وحرف': ['الفنون', 'فنون'],
+};
+
+function subjectAlreadyExists(existingDocs, meta) {
+  const keys = new Set([
+    normalizeSubjectKey(meta.labelAr),
+    normalizeSubjectKey(meta.shortLabel),
+    ...(SUBJECT_LABEL_ALIASES[meta.labelAr] || []).map(normalizeSubjectKey),
+  ]);
+  return existingDocs.some((d) => {
+    const data = d.data();
+    const labels = [data.labelAr, data.shortLabel].map(normalizeSubjectKey);
+    return labels.some((l) => keys.has(l) || [...keys].some((k) => k && l && (k.includes(l) || l.includes(k))));
+  });
+}
+
+/** Add default subjects that are not yet in Firestore (safe to run on live data). */
+export async function addMissingTeachingSubjects() {
+  const existing = await getDocs(subjectsQuery());
+  const docs = existing.docs;
+  let maxOrder = docs.reduce((m, d) => Math.max(m, d.data().order ?? 0), -1);
+  const batch = writeBatch(db);
+  let created = 0;
+
+  for (const meta of DEFAULT_TEACHING_SUBJECTS) {
+    if (subjectAlreadyExists(docs, meta)) continue;
+    maxOrder += 1;
+    const ref = doc(subjectsCol);
+    batch.set(ref, {
+      labelAr: meta.labelAr,
+      shortLabel: meta.shortLabel,
+      teacherIds: [],
+      order: maxOrder,
+      active: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    created += 1;
+  }
+
+  if (created) await batch.commit();
+  return { created };
+}
+
 export async function seedDefaultTeachingSubjects() {
   const existing = await getDocs(subjectsQuery());
-  if (!existing.empty) return { created: 0, linked: 0 };
+  if (!existing.empty) {
+    return addMissingTeachingSubjects();
+  }
 
   const created = [];
   const batch = writeBatch(db);
